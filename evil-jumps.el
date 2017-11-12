@@ -640,11 +640,8 @@ If POS is nil, it defaults to `point'."
 (defun evil-set-jump-pre-command (&optional command)
   "Set jump point if COMMAND has a non-nil :jump property."
   (setq command (or command this-command))
-  (if (evil-get-command-property command :jump)
-      (evil-set-jump)
-    (setf (evil-jumps-struct-previous-pos (evil--jumps-get-current))
-          (point-marker))))
-(put 'evil--jump-hook 'permanent-local-hook t)
+  (when (evil-get-command-property command :jump)
+    (evil-set-jump)))
 
 (put 'evil-set-jump-pre-command 'permanent-local-hook t)
 
