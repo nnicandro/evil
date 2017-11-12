@@ -800,23 +800,32 @@ Columns are counted from zero."
   (evil-first-non-blank))
 
 (evil-define-motion evil-jump-backward (count)
-  "Go to older position in jump list.
+  "Jump backward to older positions in the jump list.
+Before jumping, if no backward jumps have been made since the
+most recently set jump point set a new jump at `point'.
+
 To go the other way, press \
 \\<evil-motion-state-map>\\[evil-jump-forward]."
-  (evil--jump-backward count))
+  (unless (evil-forward-jumps-p (evil-get-jumplist))
+    (evil-set-jump)
+    (let (evil-jumps-pre-jump-hook
+          evil-jumps-post-jump-hook)
+      (evil--jump 'backward 1)))
+  (evil--jump 'backward count))
 
 (evil-define-motion evil-jump-forward (count)
-  "Go to newer position in jump list.
+  "Jump forward to newer position in the jump list.
 To go the other way, press \
 \\<evil-motion-state-map>\\[evil-jump-backward]."
-  (evil--jump-forward count))
+  (evil--jump 'forward count))
 
 (evil-define-motion evil-jump-backward-swap (count)
   "Go to the previous position in jump list.
 The current position is placed in the jump list."
-  (let ((pnt (point)))
-    (evil--jump-backward 1)
-    (evil-set-jump pnt)))
+  (let ((pos (point))
+        (evil-jumps-cross-buffers nil))
+    (evil-jump-backward 1)
+    (evil-set-jump pos)))
 
 (defvar xref-prompt-for-identifier)
 (evil-define-motion evil-jump-to-tag (arg)

@@ -528,6 +528,11 @@ Based on `evil-enclose-ace-jump-for-motion'."
   '(when (fboundp 'eldoc-add-command-completions)
      (eldoc-add-command-completions "evil-window-")))
 
+;;; Etags
+(eval-after-load 'etags
+  '(defadvice find-tag-noselect (before evil-jumps activate)
+     (evil-set-jump)))
+
 (provide 'evil-integration)
 
 ;;; evil-integration.el ends here
