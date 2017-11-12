@@ -9695,140 +9695,91 @@ parameter set."
       ("dao")
       "These two lines \n[!]have punctuation on them")))
 
+(ert-deftest evil-test-loop-over-jumps ()
+  :tags '(evil jump)
+  (let ((ring (make-ring 5)) jl)
+    (ring-insert ring 1)
+    (ring-insert ring 2)
+    (ring-insert ring 'evil)
+    (ring-insert ring 3)
+    (ring-insert ring 4)
+    (setq jl (cons t (ring-copy ring)))
+    (evil-loop-over-jumps (jl jump forwardp)
+      (if forwardp
+          (should (or (= jump 1) (= jump 2)))
+        (should (or (= jump 3) (= jump 4))))
+      (= jump 2))
+    (should (equal (ring-elements ring) '(evil 2)))))
+
 (ert-deftest evil-test-jump ()
   :tags '(evil jumps)
-  (let ((evil--jumps-buffer-targets "\\*\\(new\\|scratch\\|test\\)\\*"))
+  (let ((evil-jumps-buffer-targets "\\*\\(new\\|scratch\\|test\\)\\*"))
+    (ert-info ("Test one jump point per line")
+      (evil-test-buffer
+       "[z] z z z z z z\na a a a a a a\n"
+       ("/z" [return] "nnnn")
+       "z z z z z [z] z\na a a a a a a\n"
+       ("/a" [return] "nnnn")
+       "z z z z z z z\na a a a [a] a a\n"
+       ("\C-o")
+       "z z z z z [z] z\na a a a a a a\n"
+       ("\C-i")
+       "z z z z z z z\na a a a [a] a a\n"))
+    (ert-info ("Test backward swap")
+      (evil-test-buffer
+       "[z]\nz\nz\nz\nz\nz\n"
+       ("/z" [return] "nnnnn")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("''")
+       "z\nz\nz\nz\n[z]\nz\n"
+       ("''")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("\C-o")
+       "z\nz\nz\nz\n[z]\nz\n"
+       ("''")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("\C-o")
+       "z\nz\nz\nz\n[z]\nz\n"))
     (ert-info ("Test jumping backward and forward in a single buffer")
       (evil-test-buffer
-        "[z] z z z z z z z z z"
-        ("/z" [return])
-        "z [z] z z z z z z z z"
-        ("nnnn")
-        "z z z z z [z] z z z z"
-        ("\C-o")
-        "z z z z [z] z z z z z"
-        ("\C-o")
-        "z z z [z] z z z z z z"
-        ("\C-i\C-i")
-        "z z z z z [z] z z z z"))
+       "[z]\nz\nz\nz\nz\nz\n"
+       ("/z" [return] "nnnnn")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("\C-o")
+       "z\nz\nz\nz\n[z]\nz\n"
+       ("\C-o")
+       "z\nz\nz\n[z]\nz\nz\n"
+       ("\C-i\C-i")
+       "z\nz\nz\nz\nz\n[z]\n"))
+    (ert-info ("Test jumping backward and forward across buffers")
+      (evil-test-buffer
+       "[z] z z z z z z z z z"
+       (":new" [return] "inew buffer" [escape])
+       "new buffe[r]"
+       ("\C-o")
+       "[z] z z z z z z z z z"
+       ("\C-i")
+       "new buffe[r]"))
     (ert-info ("Test jumping backward and forward with counts")
       (evil-test-buffer
-        "[z] z z z z z z z z z"
-        ("/z" [return] "nnnn")
-        "z z z z z [z] z z z z"
-        ("3\C-o")
-        "z z [z] z z z z z z z"
-        ("2\C-i")
-        "z z z z [z] z z z z z"
-        ))
+       "[z]\nz\nz\nz\nz\nz\n"
+       ("/z" [return] "nnnnn")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("3\C-o")
+       "z\nz\n[z]\nz\nz\nz\n"
+       ("2\C-i")
+       "z\nz\nz\nz\n[z]\nz\n"))
     (ert-info ("Jump list branches off when new jump is set")
       (evil-test-buffer
-        "[z] z z z z z z z"
-        ("/z" [return] "nnnn4\C-o") ;; adds a bunch of jumps after the 2nd z
-        "z [z] z z z z z z"
-        ("/z" [return]) ;; sets a new jump, list should be reset
-        "z z [z] z z z z z"
-        ("\C-o")
-        "z [z] z z z z z z"
-        ("3\C-i") ;; even after jumping forward 3 times it can't get past the 3rd z
-        "z z [z] z z z z z"))
-    (ert-info ("Jump across files")
-      (let ((temp-file (make-temp-file "evil-test-")))
-        (unwind-protect
-            (evil-test-buffer
-              "[z] z z z z z z"
-              ("\M-x" "find-file" [return] temp-file [return] "inew buffer" [escape])
-              "new buffe[r]"
-              ("\C-o")
-              "[z] z z z z z z"
-              ("\C-i")
-              "new buffe[r]")
-          (delete-file temp-file)
-          (let ((buf (file-name-nondirectory temp-file)))
-            (when (get-buffer buf)
-              (with-current-buffer buf (set-buffer-modified-p nil))
-              (kill-buffer buf))))))
-    (ert-info ("Jump multiple times between files")
-      (let ((a (make-temp-file "evil-aa-" nil nil "evil-bb\n\nthis is a"))
-            (b (make-temp-file "evil-bb-" nil nil "evil-cc\n\nthis is b"))
-            (c (make-temp-file "evil-cc-" nil nil "this is c")))
-        (unwind-protect
-            (evil-test-buffer
-              (find-file a)
-              ("gf" [return])
-              "evil-cc\n\nthis is b"
-              ("gf" [return])
-              "this is c"
-              ("\C-o" "\C-o")
-              "evil-bb\n\nthis is a"
-              ("\C-i" "\C-i")
-              "this is c")
-          (dolist (f (list a b c))
-            (let ((buf (file-name-nondirectory f)))
-              (when (get-buffer buf)
-                (with-current-buffer buf (set-buffer-modified-p nil))
-                (kill-buffer buf)))
-            (delete-file f)))))))
-
-(ert-deftest evil-test-find-file ()
-  :tags '(evil jumps)
-  (when (memq system-type '(cygwin windows-nt ms-dos))
-    (ert-skip "[INFO] GitHub Actions has different userprofile name."))
-  (ert-info ("Find file at point (normal state)")
-    (evil-with-temp-file file-name ""
-      (evil-test-buffer
-        (vconcat "i" file-name [escape])
-        (should-not (equal file-name (buffer-file-name)))
-        ("gf")
-        (should (equal file-name (buffer-file-name))))))
-  (ert-info ("Find file at point (visual state)")
-    (evil-with-temp-file file-name ""
-      (evil-test-buffer
-        (vconcat "iuser@localhost:" file-name "$" [escape])
-        (should-not (equal file-name (buffer-file-name)))
-        ("0f:lvt$gf")
-        (should (equal file-name (buffer-file-name))))))
-  (ert-info ("Find file at point with line number")
-    (let* ((line-number 3)
-           (file-content (make-string (* 2 line-number) ?\n)))
-      (evil-with-temp-file file-name (insert file-content)
-          (evil-test-buffer
-            (vconcat "i" file-name (format ":%d" line-number) [escape])
-            (should (and (not (equal file-name (buffer-file-name)))
-                         (not (equal line-number (line-number-at-pos)))))
-            ("gF")
-            (should (and (equal file-name (buffer-file-name))
-                         (equal line-number (line-number-at-pos))))))))
-  (ert-info ("Find file at point with line and column numbers")
-    (let* ((line-number 3)
-           (column-number 5)
-           (file-content (mapconcat #'identity
-                                    (make-list (* 2 line-number)
-                                               (make-string (* 2 column-number) ?\s))
-                                    "\n")))
-      (evil-with-temp-file file-name (insert file-content)
-        (evil-test-buffer
-          (vconcat "i" file-name (format ":%d:%d" line-number column-number) [escape])
-          (should (and (not (equal file-name (buffer-file-name)))
-                       (not (equal line-number (line-number-at-pos)))
-                       (not (equal column-number (current-column)))))
-          ("gF")
-          (should (and (equal file-name (buffer-file-name))
-                       (equal line-number (line-number-at-pos))
-                       (equal column-number (1+ (current-column))))))))))
-
-(ert-deftest evil-test-jump-buffers ()
-  :tags '(evil jumps)
-  (skip-unless nil)
-  (ert-info ("Test jumping backward and forward across buffers")
-    (evil-test-buffer
-      "[z] z z z z z z z z z"
-      (":new" [return] "inew buffer" [escape])
-      "new buffe[r]"
-      ("\C-o")
-      "[z] z z z z z z z z z"
-      ("\C-i")
-      "new buffe[r]")))
+       "[z]\nz\nz\nz\nz\nz\n"
+       ("/z" [return] "nnnn4\C-o") ;; adds a bunch of jumps after the 2nd z
+       "[z]\nz\nz\nz\nz\nz\n"
+       ("/z" [return] "nn") ;; sets a new jump, list should be reset
+       "z\nz\n[z]\nz\nz\nz\n"
+       ("\C-o")
+       "z\n[z]\nz\nz\nz\nz\n"
+       ("3\C-i") ;; even after jumping forward 3 times it can't get past the 3rd z
+       "z\nz\n[z]\nz\nz\nz\n"))))
 
 (ert-deftest evil-test-abbrev-expand ()
   :tags '(evil abbrev)
