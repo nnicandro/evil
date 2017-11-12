@@ -487,6 +487,11 @@ Based on `evil-enclose-ace-jump-for-motion'."
      (evil-set-command-property 'xref-find-definitions :jump t)
      (evil-set-command-property 'xref-find-references :jump t)))
 
+;;; Etags
+(eval-after-load 'etags
+  '(defadvice find-tag-noselect (before evil-jumps activate)
+     (evil-set-jump)))
+
 (provide 'evil-integration)
 
 ;;; evil-integration.el ends here
