@@ -1957,7 +1957,9 @@ The following special registers are supported.
            ((eq register ?\")
             (current-kill 0))
            ((<= ?1 register ?9)
-            (let ((reg (- register ?1)))
+            (let ((kill-ring evil-delete-kill-ring)
+                  (kill-ring-yank-pointer evil-delete-kill-ring)
+                  (reg (- register ?1)))
               (and (< reg (length kill-ring))
                    (current-kill reg t))))
            ((memq register '(?* ?+))
@@ -2090,15 +2092,19 @@ register instead of replacing its content."
    ;; don't allow modification of read-only registers
    ((member register '(?: ?. ?%))
     (user-error "Can't modify read-only register"))
-   ((eq register ?\") (kill-new text))
-   ((<= ?1 register ?9)
-    (if (null kill-ring)
-        (kill-new text)
-      (let ((kill-ring-yank-pointer kill-ring-yank-pointer)
-            interprogram-paste-function
-            interprogram-cut-function)
-        (current-kill (- register ?1))
-        (setcar kill-ring-yank-pointer text))))
+   ((eq register ?\")
+    (kill-new text)
+    (evil-set-register ?0 text))
+   ((and (<= ?1 register) (<= register ?9))
+    (let ((kill-ring evil-delete-kill-ring)
+          (kill-ring-yank-pointer evil-delete-kill-ring))
+      (if (null kill-ring)
+          (kill-new text)
+        (let (interprogram-paste-function
+              interprogram-cut-function)
+          (current-kill (- register ?1))
+          (setcar kill-ring-yank-pointer text)))
+      (setq evil-delete-kill-ring kill-ring)))
    ((eq register ?*) (evil-set-selection 'PRIMARY text))
    ((eq register ?+) (evil-set-selection 'CLIPBOARD text))
    ((eq register ?-) (setq evil-last-small-deletion text))
@@ -2349,17 +2355,51 @@ The tracked insertion is set to `evil-last-insertion'."
 
 ;;; Paste
 
+(defun evil-set-register-on-yank (register text)
+  "Set REGISTER to TEXT.
+Additionally set register 0 and shift the remaining number
+registers if necessary."
+  (when register
+    (evil-set-register register text))
+  (unless (eq register ?_)
+    (kill-new text)
+    (unless (or register evil-is-yank-and-delete)
+      ;; "0 register contains last yanked text
+      (evil-set-register ?0 text)))
+  ;; Handle 1-9 registers when deleting
+  ;; http://vimdoc.sourceforge.net/htmldoc/change.html#registers
+  (when (and evil-is-yank-and-delete (not (eq register ?_)))
+    (let ((special-delete-motions
+           '(evil-ex-search-forward
+             evil-ex-search-backward
+             evil-ex-search-next
+             evil-ex-search-previous
+             evil-search-forward
+             evil-search-backward
+             evil-search-next
+             evil-search-previous
+             evil-jump-item
+             evil-backward-sentence-begin
+             evil-forward-sentence-begin
+             evil-goto-mark
+             evil-backward-paragraph
+             evil-forward-paragraph)))
+      (when (or (null register)
+                (memq evil-this-motion special-delete-motions))
+        (let ((kill-ring evil-delete-kill-ring)
+              (kill-ring-yank-pointer)
+              (kill-ring-max 9))
+          (kill-new text)
+          (setq evil-delete-kill-ring kill-ring)))))
+  text)
+
 (defun evil-yank-characters (beg end &optional register yank-handler)
   "Save the characters defined by the region BEG and END in the kill-ring."
   (let ((text (filter-buffer-substring beg end)))
     (when yank-handler
-      (put-text-property 0 (length text) 'yank-handler (list yank-handler) text))
-    (when register
-      (evil-set-register register text))
-    (when evil-was-yanked-without-register
-      (evil-set-register ?0 text)) ; "0 register contains last yanked text
-    (unless (eq register ?_)
-      (kill-new text))))
+      (put-text-property 0 (length text) 'yank-handler (list yank-handler) text)
+      (setq text (propertize text 'yank-handler (list yank-handler))))
+    (evil-set-register-on-yank register text)))
 
 (defun evil-yank-lines (beg end &optional register yank-handler)
   "Save the lines in the region BEG and END into the kill-ring."
@@ -2373,12 +2413,7 @@ The tracked insertion is set to `evil-last-insertion'."
               (/= (aref text (1- (length text))) ?\n))
       (setq text (concat text "\n")))
     (put-text-property 0 (length text) 'yank-handler yank-handler text)
-    (when register
-      (evil-set-register register text))
-    (when evil-was-yanked-without-register
-      (evil-set-register ?0 text)) ; "0 register contains last yanked text
-    (unless (eq register ?_)
-      (kill-new text))))
+    (evil-set-register-on-yank register text)))
 
 (defun evil-yank-rectangle (beg end &optional register yank-handler)
   "Save the rectangle defined by region BEG and END into the kill-ring."
@@ -2396,13 +2431,7 @@ The tracked insertion is set to `evil-last-insertion'."
                               #'evil-delete-yanked-rectangle))
           (text (mapconcat #'identity lines "\n")))
       (put-text-property 0 (length text) 'yank-handler yank-handler text)
-      (when register
-        (evil-set-register register text))
-      (when evil-was-yanked-without-register
-        (evil-set-register ?0 text)) ; "0 register contains last yanked text
-      (unless (eq register ?_)
-        (kill-new text))
-      text)))
+      (evil-set-register-on-yank register text))))
 
 (defun evil-remove-yank-excluded-properties (text)
   "Remove `yank-excluded-properties' from TEXT."
