@@ -3577,13 +3577,18 @@ If ARG is nil this function calls `recompile', otherwise it calls
       [("Register" 10 nil)
        ("Value" 1000 nil)]
       :entries
-      (cl-loop for (key . val) in display-regs
-               collect `(nil [,(char-to-string key)
-                              ,(cond ((stringp val)
-                                      (replace-regexp-in-string "\n" "^J" val))
-                                     ((vectorp val)
-                                      (key-description val))
-                                     (t ""))])))))
+      (progn
+        (cl-loop
+         with nl = (propertize
+                    "\n" 'display (propertize "^J" 'face 'escape-glyph))
+         for (key . val) in display-regs
+         collect `(nil [,(char-to-string key)
+                        ,(cond
+                          ((stringp val)
+                           (mapconcat #'identity (split-string val "\n") nl))
+                          ((vectorp val)
+                           (edmacro-format-keys val))
+                          (t ""))]))))))
 
 (evil-define-command evil-show-marks (mrks)
   "Show all marks.
