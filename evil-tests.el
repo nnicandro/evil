@@ -2716,6 +2716,101 @@ word1[a] word2b word2c word2d")))
     ("kdd\"0p")
     "line 1\nline 1\nline 1\n[l]ine 1\n"))
 
+(ert-deftest evil-test-number-registers-yank ()
+  "Test number register behavior after `evil-yank'"
+  (ert-info ("yanks without named register")
+    (dotimes (i 3)
+      (evil-set-register (+ ?0 i) ""))
+    (evil-test-buffer
+      "a\n[b]\nc\nd\n"
+      ("yy" [return])
+      "a\nb\n[c]\nd\n"
+      (should (string= (evil-get-register ?\") "b\n"))
+      (should (string= (evil-get-register ?0) "b\n"))
+      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?2) ""))
+      ("yy" [return])
+      "a\nb\nc\n[d]\n"
+      (should (string= (evil-get-register ?\") "c\n"))
+      (should (string= (evil-get-register ?0) "c\n"))
+      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?2) ""))
+      ("yy")
+      (should (string= (evil-get-register ?\") "d\n"))
+      (should (string= (evil-get-register ?0) "d\n"))
+      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?2) ""))))
+  (ert-info ("yanks with named register")
+    (evil-set-register ?0 "")
+    (evil-test-buffer
+      "a\n[b]\nc\nd\n"
+      ("\"ayy")
+      (should (string= (evil-get-register ?\") "b\n"))
+      (should (string= (evil-get-register ?a) "b\n"))
+      (should (string= (evil-get-register ?0) "")))))
+
+(ert-deftest evil-test-number-registers-delete ()
+  "Test number register behavior after `evil-delete'"
+  (ert-info ("deletions without named register")
+    (dotimes (i 10)
+      (evil-set-register (+ ?0 i) ""))
+    (evil-test-buffer
+      "[a]\nb\nc\nd\n"
+      ("dd")
+      "[b]\nc\nd\n"
+      (should (string= (evil-get-register ?\") "a\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) "a\n"))
+      (should (string= (evil-get-register ?2) ""))
+      (should (string= (evil-get-register ?3) ""))
+      ("dd")
+      "[c]\nd\n"
+      (should (string= (evil-get-register ?\") "b\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) "b\n"))
+      (should (string= (evil-get-register ?2) "a\n"))
+      (should (string= (evil-get-register ?3) ""))
+      ("dd")
+      "d\n"
+      (should (string= (evil-get-register ?\") "c\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) "c\n"))
+      (should (string= (evil-get-register ?2) "b\n"))
+      (should (string= (evil-get-register ?3) "a\n"))))
+  (ert-info ("deletions with named register")
+    (dotimes (i 10)
+      (evil-set-register (+ ?0 i) ""))
+    (evil-test-buffer
+      "[a]\nb\nc\nd\n"
+      ("\"add")
+      "[b]\nc\nd\n"
+      (should (string= (evil-get-register ?\") "a\n"))
+      (should (string= (evil-get-register ?a) "a\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?2) ""))
+      ("dd")
+      "[c]\nd\n"
+      (should (string= (evil-get-register ?\") "b\n"))
+      (should (string= (evil-get-register ?a) "a\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) "b\n"))
+      (should (string= (evil-get-register ?2) "")))
+    (ert-info ("special handling of motion operators")
+      (evil-test-buffer
+        ;; Some operators still add the kill to the number registers in
+        ;; addition to the named register
+        "[c]\nd\n"
+        ("/d" [return] "k")
+        "[c]\nd\n"
+        ("\"adn")
+        "[d]\n"
+        (should (string= (evil-get-register ?\") "c\n"))
+        (should (string= (evil-get-register ?a) "c\n"))
+        (should (string= (evil-get-register ?0) ""))
+        (should (string= (evil-get-register ?1) "c\n"))
+        (should (string= (evil-get-register ?2) "b\n"))))))
+
 (ert-deftest evil-test-align ()
   "Test `evil-align-left', `evil-align-right' and `evil-align-center'."
   :tags '(evil operator)
