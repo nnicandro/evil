@@ -2510,29 +2510,15 @@ registers if necessary."
       (evil-set-register ?0 text)))
   ;; Handle 1-9 registers when deleting
   ;; http://vimdoc.sourceforge.net/htmldoc/change.html#registers
-  (when (and evil-is-yank-and-delete (not (eq register ?_)))
-    (let ((special-delete-motions
-           '(evil-ex-search-forward
-             evil-ex-search-backward
-             evil-ex-search-next
-             evil-ex-search-previous
-             evil-search-forward
-             evil-search-backward
-             evil-search-next
-             evil-search-previous
-             evil-jump-item
-             evil-backward-sentence-begin
-             evil-forward-sentence-begin
-             evil-goto-mark
-             evil-backward-paragraph
-             evil-forward-paragraph)))
-      (when (or (null register)
-                (memq evil-this-motion special-delete-motions))
-        (let ((kill-ring evil-delete-kill-ring)
-              (kill-ring-yank-pointer)
-              (kill-ring-max 9))
-          (kill-new text)
-          (setq evil-delete-kill-ring kill-ring)))))
+  (when (and evil-is-yank-and-delete
+             (not (eq register ?_))
+             (or (null register)
+                 (memq evil-this-motion evil-special-delete-motions)))
+    (let ((kill-ring evil-delete-kill-ring)
+          (kill-ring-yank-pointer)
+          (kill-ring-max 9))
+      (kill-new text)
+      (setq evil-delete-kill-ring kill-ring)))
   text)
 
 (defun evil-yank-characters (beg end &optional register yank-handler)
