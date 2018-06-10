@@ -9695,21 +9695,90 @@ parameter set."
       ("dao")
       "These two lines \n[!]have punctuation on them")))
 
+(defun evil-test-make-test-jumplist (forward-jumps backward-jumps)
+  "Construct a test jumplist.
+FORWARD-JUMPS and BACKWARD-JUMPS should be ordered such that
+appending them together would give an order of jumps where the
+most newly set jump point is the first element and the oldest is
+the last."
+  (let* ((ring (make-ring (+ (length forward-jumps)
+                             (length backward-jumps)
+                             1)))
+         (jumplist (cons t ring)))
+    (prog1 jumplist
+      (setq forward-jumps (reverse forward-jumps))
+      (while forward-jumps
+        (ring-insert ring (pop forward-jumps)))
+      (ring-insert ring 'evil)
+      (setq backward-jumps (reverse backward-jumps))
+      (while backward-jumps
+        (ring-insert ring (pop backward-jumps))))))
+
 (ert-deftest evil-test-loop-over-jumps ()
   :tags '(evil jump)
-  (let ((ring (make-ring 5)) jl)
-    (ring-insert ring 1)
-    (ring-insert ring 2)
-    (ring-insert ring 'evil)
-    (ring-insert ring 3)
-    (ring-insert ring 4)
-    (setq jl (cons t (ring-copy ring)))
-    (evil-loop-over-jumps (jl jump forwardp)
-      (if forwardp
-          (should (or (= jump 1) (= jump 2)))
-        (should (or (= jump 3) (= jump 4))))
-      (= jump 2))
-    (should (equal (ring-elements ring) '(evil 2)))))
+  (ert-info ("Loop order")
+    (let ((jumplist (evil-test-make-test-jumplist '(1 2) '(3 4)))
+          forward-jumps backward-jumps)
+      (evil-loop-over-jumps (jumplist jump forwardp)
+        (if forwardp
+            (push jump forward-jumps)
+          (push jump backward-jumps)))
+      (should (equal (ring-elements (cdr jumplist)) '(3 4 evil 1 2)))
+      (should (equal forward-jumps '(2 1)))
+      (should (equal backward-jumps '(4 3)))))
+  (ert-info ("Loop end condition")
+    (let ((jumplist (evil-test-make-test-jumplist '(1 2) '(3 4))))
+      (evil-loop-over-jumps (jumplist jump) t)
+      (should (equal (ring-elements (cdr jumplist)) '(3 4 evil 1 2)))
+      (evil-loop-over-jumps (jumplist jump) (>= jump 3))
+      (should (equal (ring-elements (cdr jumplist)) '(3 4 evil)))
+      (setq jumplist (evil-test-make-test-jumplist '(1 2) '(3 4)))
+      (evil-loop-over-jumps (jumplist jump) (/= jump 3))
+      (should (equal (ring-elements (cdr jumplist)) '(4 evil 1 2))))))
+
+(ert-deftest evil-test-remove-jump ()
+  :tags '(evil jump)
+  (ert-info ("Duplicated jumps")
+    (evil-test-buffer
+      "[z] z z z\nz z z z"
+      (let* ((j1 (cons 1 (set-marker (make-marker) (point))))
+             (j2 (cons 2 (set-marker (make-marker) (point))))
+             (j3 (cons 3 (set-marker (make-marker) (1+ (line-end-position)))))
+             (jumplist (evil-test-make-test-jumplist nil (list j1 j2 j3))))
+        (evil-remove-jump jumplist j1)
+        (should (equal (ring-elements (cdr jumplist)) (list j3 'evil)))))
+    (let* ((j1 (cons 1 '("foo" . 1)))
+           (j2 (cons 2 '("foo" . 1)))
+           (j3 (cons 3 '("foo" . 2)))
+           (jumplist (evil-test-make-test-jumplist nil (list j1 j2 j3))))
+      (evil-remove-jump jumplist j1)
+      (should (equal (ring-elements (cdr jumplist)) (list j3 'evil)))))
+  (ert-info ("Jumps on the same line")
+    (evil-test-buffer
+      "[z] z z z\nz z z z"
+      (let* ((j1 (cons 1 (set-marker (make-marker) (point))))
+             (j2 (cons 2 (set-marker (make-marker) (1+ (point)))))
+             (j3 (cons 3 (set-marker (make-marker) (1+ (line-end-position)))))
+             (jumplist (evil-test-make-test-jumplist nil (list j1 j2 j3))))
+        (evil-remove-jump jumplist j1)
+        (should (equal (ring-elements (cdr jumplist)) (list j3 'evil)))))))
+
+(ert-deftest evil-test-current-jumps ()
+  :tags '(evil jumps)
+  (let ((jumplist (evil-test-make-test-jumplist '(1 2) '(3 4))))
+    (cl-destructuring-bind (forward-jumps backward-jumps)
+        (evil-current-jumps jumplist)
+      (should (equal forward-jumps '(1 2)))
+      (should (equal backward-jumps '(3 4))))))
+
+(ert-deftest evil-test-merge-jumplists ()
+  :tags '(evil jumps)
+  (let ((jl1 (evil-test-make-test-jumplist
+              nil '((8) (6) (4) (3) (2) (1))))
+        (jl2 (evil-test-make-test-jumplist
+              nil '((8) (7) (5) (2) (1)))))
+    (should (equal (ring-elements (cdr (evil-merge-jumplists jl1 jl2)))
+                   '((8) (7) (6) (5) (4) (3) (2) (1) evil)))))
 
 (ert-deftest evil-test-jump ()
   :tags '(evil jumps)
