@@ -2497,6 +2497,22 @@ The tracked insertion is set to `evil-last-insertion'."
 
 ;;; Paste
 
+(defun evil-set-delete-register (text)
+  "Push TEXT to `evil-delete-kill-ring'."
+  ;; TODO: How should yank-handler work here?
+  (let ((kill-ring evil-delete-kill-ring)
+        (kill-ring-yank-pointer)
+        (kill-ring-max 9))
+    ;; Handle the behavior of `kill-region'
+    (if (eq last-command 'kill-region)
+        (setcar kill-ring text)
+      (kill-new text))
+    (setq evil-delete-kill-ring kill-ring)))
+
+(defadvice kill-region (after evil activate)
+  "Update `evil-delete-kill-ring'."
+  (evil-set-delete-register (current-kill 0 t)))
+
 (defun evil-set-register-on-yank (register text)
   "Set REGISTER to TEXT.
 Additionally set register 0 and shift the remaining number
@@ -2514,11 +2530,7 @@ registers if necessary."
              (not (eq register ?_))
              (or (null register)
                  (memq evil-this-motion evil-special-delete-motions)))
-    (let ((kill-ring evil-delete-kill-ring)
-          (kill-ring-yank-pointer)
-          (kill-ring-max 9))
-      (kill-new text)
-      (setq evil-delete-kill-ring kill-ring)))
+    (evil-set-delete-register text))
   text)
 
 (defun evil-yank-characters (beg end &optional register yank-handler)
