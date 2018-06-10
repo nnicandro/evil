@@ -811,7 +811,9 @@ To go the other way, press \
 \\<evil-motion-state-map>\\[evil-jump-forward]."
   (unless (evil-forward-jumps-p (evil-get-jumplist))
     (evil-set-jump)
-    (evil--jump 'backward 1))
+    (let (evil-jumps-pre-jump-hook
+          evil-jumps-post-jump-hook)
+      (evil--jump 'backward 1)))
   (evil--jump 'backward count))
 
 (evil-define-motion evil-jump-forward (count)
