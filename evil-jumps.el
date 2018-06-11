@@ -364,7 +364,17 @@ FRAME-OR-WINDOW is nil, default to the `selected-window'."
            (t (set-marker (cdr jump) nil)
               (setcdr jump (cons position buffer-file-name)))))))))
 
-(put 'evil-swap-out-jump-markers 'permanent-local-hook t)
+(defun evil-swap-out-all-jump-markers (&optional make-markers)
+  "Swap out jump markers of the `current-buffer' for all windows in all frames.
+Call `evil-swap-out-jump-markers' on every window in every frame
+for the `current-buffer'. MAKE-MARKERS has the same meaning as in
+`evil-swap-out-jump-markers'."
+  (dolist (frame (frame-list))
+    (evil-swap-out-jump-markers make-markers frame)
+    (dolist (window (window-list frame))
+      (evil-swap-out-jump-markers make-markers window))))
+
+(put 'evil-swap-out-all-jump-markers 'permanent-local-hook t)
 
 ;;; Rotating the jumplist
 
@@ -577,10 +587,7 @@ A copy is necessary when the copy flag of JUMPLIST is t."
                 (marker-position marker)))
       (`(,_ ,(and (pred integerp) position) . ,(and (pred stringp) target))
        (funcall do-jump #'find-file target position)
-       (dolist (frame (frame-list))
-         (evil-swap-out-jump-markers 'make-markers frame)
-         (dolist (window (window-list frame))
-           (evil-swap-out-jump-markers 'make-markers window))))
+       (evil-swap-out-all-jump-markers 'make-markers))
       (`,elem (error "Invalid jump in jumplist (%s)" elem)))))
 
 (defun evil--jump (dir count)
@@ -742,7 +749,7 @@ INDEX equal to 0."
     (dolist (buf (buffer-list))
       (when (evil-jump-target-p buf)
         (with-current-buffer buf
-          (evil-swap-out-jump-markers 'make-markers))))
+          (evil-swap-out-all-jump-markers 'make-markers))))
     (add-hook 'savehist-save-hook #'evil-sync-jump-history)
     (remove-hook 'savehist-mode-hook #'evil-load-jump-history)))
 
@@ -852,11 +859,11 @@ another window's jumplist."
 Otherwise disable jumps."
   (cond
    (evil-local-mode
-    (add-hook 'kill-buffer-hook #'evil-swap-out-jump-markers nil t)
+    (add-hook 'kill-buffer-hook #'evil-swap-out-all-jump-markers nil t)
     (add-hook 'pre-command-hook #'evil-set-jump-pre-command nil t)
     (add-hook 'next-error-hook #'evil-set-jump nil t))
    ((not evil-local-mode)
-    (remove-hook 'kill-buffer-hook #'evil-swap-out-jump-markers t)
+    (remove-hook 'kill-buffer-hook #'evil-swap-out-all-jump-markers t)
     (remove-hook 'pre-command-hook #'evil-set-jump-pre-command t)
     (remove-hook 'next-error-hook #'evil-set-jump t))))
 
