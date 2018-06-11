@@ -847,10 +847,6 @@ another window's jumplist."
        (unless (eq window this-window)
          (evil-merge-jumps-into-frame window (selected-frame)))))))
 
-(eval-after-load 'etags
-  '(defadvice find-tag-noselect (before evil-jumps activate)
-     (evil-set-jump)))
-
 (defun evil-enable-jumps-in-buffer ()
   "Enable jumps if `evil-local-mode' is non-nil.
 Otherwise disable jumps."
