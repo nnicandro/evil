@@ -3699,12 +3699,76 @@ Default position is the beginning of the buffer."
         (message "\"%s\" %d %slines --%s--" file nlines readonly perc)
       (message "%d lines --%s--" nlines perc))))
 
+(defun evil-sieve-lines (regex &optional negate)
+  "Separate lines matching REGEX from those that don't.
+Leave `point' at the beginning of the line that separates lines
+matching REGEX such that `point' to `point-max' contains all the
+lines matching REGEX and `point-min' to `point' contains all
+other lines.
+
+If NEGATE is non-nil place the lines that match REGEX before those
+that don't.
+
+Ignore case when matching REGEX."
+  (let ((boundary (point-min))
+        (case-fold-search t)
+        match)
+    (goto-char (point-min))
+    (while (< (point) (point-max))
+      (cond
+       ((progn
+          (setq match (looking-at-p regex))
+          (if negate match (not match)))
+        (cond
+         ((= boundary (point))
+          (forward-line)
+          (setq boundary (point)))
+         (t
+          (let* ((beg (point-at-bol))
+                 (end (point-at-eol))
+                 (line (delete-and-extract-region beg end)))
+            (when (eq (char-after) ?\n)
+              (delete-char 1))
+            (save-excursion
+              (goto-char boundary)
+              (insert line "\n")
+              (setq boundary (point)))))))
+       (t (forward-line))))
+    (goto-char boundary)))
+
+(defun evil-sort-numeric (reverse beg end)
+  "Sort the lines in the region between (BEG END) numerically.
+Sorts all lines that begin with a number and place all other
+lines at the beginning of the region. If optional argument
+REVERSE is non-nil, reverse the lines afterward."
+  (let ((region (evil-contract beg end 'line))
+        (inhibit-modification-hooks t))
+    (setq beg (nth 0 region)
+          end (nth 1 region))
+    (save-excursion
+      (evil-with-restriction beg end
+        (goto-char (point-min))
+        ;; Separate lines that do not begin with numbers from those that do,
+        ;; lines that begin with numbers will come after lines that don't.
+        (evil-sieve-lines "\\(0x\\)[0-9a-f]\\|0[0-7]\\|-?[0-9]")
+        ;; Narrow to only the numeric lines
+        (evil-with-restriction (point) (point-max)
+          (sort-numeric-fields 1 (point-min) (point-max))
+          ;; Separate out hex numbers and octal numbers so that decimal
+          ;; numbers come first, then octal, and then hex.
+          (evil-sieve-lines "\\(0x\\)[0-9a-f]")
+          (evil-with-restriction (point-min) (point)
+            (evil-sieve-lines "\\(0\\)[0-7]")))
+        (when reverse
+          (reverse-region (point-min) (point-max)))))))
+
 (evil-define-operator evil-ex-sort (beg end &optional options reverse)
   "The Ex sort command.
-\[BEG,END]sort[!] [i][u]
+\[BEG,END]sort[!] [i][n][u]
 The following additional options are supported:
 
   * i   ignore case
+  * n   sort numerically
   * u   remove duplicate lines
 
 The 'bang' argument means to sort in reverse order."
@@ -3713,13 +3777,16 @@ The 'bang' argument means to sort in reverse order."
   (interactive "<r><a><!>")
   (let ((beg (copy-marker beg))
         (end (copy-marker end))
-        sort-fold-case uniq)
+        sort-fold-case uniq numeric)
     (dolist (opt (append options nil))
       (cond
        ((eq opt ?i) (setq sort-fold-case t))
+       ((eq opt ?n) (setq numeric t))
        ((eq opt ?u) (setq uniq t))
        (t (user-error "Unsupported sort option: %c" opt))))
-    (sort-lines reverse beg end)
+    (if numeric
+        (evil-sort-numeric reverse beg end)
+      (sort-lines reverse beg end))
     (when uniq
       (let (line prev-line)
         (goto-char beg)
