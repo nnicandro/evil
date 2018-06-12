@@ -3741,7 +3741,7 @@ Ignore case when matching REGEX."
 Sorts all lines that begin with a number and place all other
 lines at the beginning of the region. If optional argument
 REVERSE is non-nil, reverse the lines afterward."
-  (let ((region (evil-contract beg end 'line))
+  (let ((region (evil-expand beg end 'line))
         (inhibit-modification-hooks t))
     (setq beg (nth 0 region)
           end (nth 1 region))
@@ -3750,10 +3750,18 @@ REVERSE is non-nil, reverse the lines afterward."
         (goto-char (point-min))
         ;; Separate lines that do not begin with numbers from those that do,
         ;; lines that begin with numbers will come after lines that don't.
-        (evil-sieve-lines "\\(0x\\)[0-9a-f]\\|0[0-7]\\|-?[0-9]")
+        (evil-sieve-lines "\\(0x\\)[0-9a-f]\\|0[0-7]\\|-?[0-9]\\|\\w+[0-9]")
         ;; Narrow to only the numeric lines
         (evil-with-restriction (point) (point-max)
-          (sort-numeric-fields 1 (point-min) (point-max))
+          ;; Temporarily bind `string-to-number' to support numbers that begin
+          ;; with a prefix when sorting
+          (let ((old-sn (symbol-function 'string-to-number)))
+            (flet ((string-to-number
+                    (string &optional base)
+                    (when (string-match "\\w+\\([0-9]\\)" string)
+                      (setq string (substring string (match-beginning 1))))
+                    (funcall old-sn string base)))
+              (sort-numeric-fields 1 (point-min) (point-max))))
           ;; Separate out hex numbers and octal numbers so that decimal
           ;; numbers come first, then octal, and then hex.
           (evil-sieve-lines "\\(0x\\)[0-9a-f]")
