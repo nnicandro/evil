@@ -352,21 +352,22 @@ pairs to markers instead. If FRAME-OR-WINDOW is non-nil, then
 swap out markers for FRAME-OR-WINDOW's jumplist. If
 FRAME-OR-WINDOW is nil, default to the `selected-window'."
   (or frame-or-window (setq frame-or-window (selected-window)))
-  (when (evil-jump-target-p (current-buffer))
+  ;; Can't swap out markers of buffer targets, i.e. buffers with a nil
+  ;; `buffer-file-name' so ignore them.
+  (when (and buffer-file-name (evil-jump-target-p (current-buffer)))
+    (evil-maybe-copy-jumplist (evil-get-jumplist frame-or-window))
     (evil-loop-over-jumps ((evil-get-jumplist frame-or-window) jump nil
                            (lambda (jump)
                              (string= (evil-jump-marker-target jump)
-                                      (or buffer-file-name (buffer-name)))))
+                                      buffer-file-name)))
       (let ((position (evil-jump-marker-position jump)))
         (if make-markers
-            (cond
-             ((markerp (cdr jump)))
-             (t (setcdr jump (set-marker (make-marker) position))))
-          (cond
-           ((not buffer-file-name) nil)
-           ((not (markerp (cdr jump))))
-           (t (set-marker (cdr jump) nil)
-              (setcdr jump (cons position buffer-file-name)))))))))
+            (or (markerp (cdr jump))
+                (setcdr jump (set-marker (make-marker) position)))
+          (or (not (markerp (cdr jump)))
+              (progn
+                (set-marker (cdr jump) nil)
+                (setcdr jump (cons position buffer-file-name)))))))))
 
 (defun evil-swap-out-all-jump-markers (&optional make-markers)
   "Swap out jump markers of the `current-buffer' for all windows in all frames.
