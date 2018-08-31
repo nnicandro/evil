@@ -231,9 +231,8 @@ skipped over and are left in the jumplist unchanged.
          (fun (make-symbol "funvar"))
          (forwardp (or (pop spec) (make-symbol "forwardpvar")))
          (filter-fun (make-symbol "filter-funvar"))
-         (pred `(if (funcall ,filter-fun ,jump)
-                    (funcall ,fun)
-                  t)))
+         (pred `(or (not (funcall ,filter-fun ,jump))
+                    (funcall ,fun))))
     `(unless (or (null (cdr ,jumplist)) (ring-empty-p (cdr ,jumplist)))
        (let* ((,ring (cdr ,jumplist))
               (,head (ring-remove ,ring 0))
@@ -244,8 +243,10 @@ skipped over and are left in the jumplist unchanged.
                       (condition-case err
                           (progn ,@body)
                         (error
-                         (message "Error in `evil-loop-over-jumps': %s" err))))))
-         ;; Find the first jump that is used to determine when to stop iterating
+                         (prog1 t
+                           (message "Error in `evil-loop-over-jumps': %s" err)))))))
+         ;; Find the first jump that is used to determine when to stop
+         ;; iterating
          (while (not (or (eq ,jump 'evil) ,pred))
            (setq ,head (ring-remove ,ring 0)
                  ,jump ,head))
