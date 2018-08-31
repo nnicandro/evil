@@ -186,9 +186,11 @@ jump to positions in other buffers."
   :type '(repeat string)
   :group 'evil-jumps)
 
-(defcustom evil-jumps-buffer-targets "\\*\\(new\\|scratch\\)\\*"
-  "Regexp to match against `buffer-name' to determine whether it's a valid jump target."
-  :type 'string
+(defcustom evil-jumps-allowed-buffer-patterns '("\\*new\\*" "\\*scratch\\*")
+  "When `buffer-name' matches one of these patterns, jumps are allowed.
+These patterns only checked when the `current-buffer' has no
+`buffer-file-name'."
+  :type '(repeat string)
   :group 'evil-jumps)
 
 (defvar savehist-additional-variables)
@@ -302,14 +304,13 @@ jumplists of two windows."
     (cdr-safe (cdr-safe marker))))
 
 (defun evil-jump-target-p (item)
-  "Is ITEM a valid jump target?
-If ITEM is a buffer with no `buffer-file-name', then its
-`buffer-name' must match `evil-jumps-buffer-targets' to be a
-valid jump target. Or if the buffer has a file name, then the
-file name must not match one of
-`evil-jumps-ignored-file-patterns' and must point to an existing
-file. In the case that the current buffer is visiting a remote
-file, the file existence check is not performed."
+  "Is ITEM a valid jump target? If ITEM is a buffer with no
+`buffer-file-name', then its `buffer-name' must match
+`evil-jumps-allowed-buffer-patterns' to be a valid jump target.
+Or if the buffer has a file name, then the file name must not
+match one of `evil-jumps-ignored-file-patterns' and must point to
+an existing file. In the case that the current buffer is visiting
+a remote file, the file existence check is not performed."
   (let* ((buffer (or (and (stringp item) (get-buffer item))
                      (and (bufferp item) item)))
          (path (or (and buffer (buffer-file-name
@@ -321,7 +322,9 @@ file, the file existence check is not performed."
                   (or (file-remote-p path)
                       (file-exists-p path)))
       (when buffer
-        (string-match-p evil-jumps-buffer-targets (buffer-name buffer))))))
+        (cl-loop
+         for pattern in evil-jumps-allowed-buffer-patterns
+         thereis (string-match-p pattern path))))))
 
 (defun evil-jump-marker-p (marker)
   "Is MARKER a valid jump marker?
