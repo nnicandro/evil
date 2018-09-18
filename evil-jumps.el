@@ -325,7 +325,7 @@ a remote file, the file existence check is not performed."
       (when buffer
         (cl-loop
          for pattern in evil-jumps-allowed-buffer-patterns
-         thereis (string-match-p pattern path))))))
+         thereis (string-match-p pattern (buffer-name buffer)))))))
 
 (defun evil-jump-marker-p (marker)
   "Is MARKER a valid jump marker?
