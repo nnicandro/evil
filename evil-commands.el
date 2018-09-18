@@ -2092,7 +2092,8 @@ The return value is the yanked text."
        (delete-overlay overlay))))
   (when (evil-paste-before nil register t)
     ;; go to end of pasted text
-    (unless (eobp)
+    (when (and evil-move-cursor-back
+               (not (eobp)))
       (forward-char))))
 
 (defun evil-paste-last-insertion ()
