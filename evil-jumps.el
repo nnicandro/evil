@@ -1,7 +1,8 @@
 ;;; evil-jumps.el --- Jump list implementation  -*-
 
-;; Author: Bailey Ling <bling at live.ca>
-;;         Nathaniel Nicandro <nathanielnicandro at gmail.com>
+;; Author: Nathaniel Nicandro <nathanielnicandro at gmail.com>
+;;         Bailey Ling <bling at live.ca>
+;;
 
 ;; Version: 1.15.0
 
@@ -55,8 +56,8 @@
 ;; split windows you may add the command to `evil-jumps-ignored-commands'. As
 ;; an example, since `evil-show-jumps' splits the window a new jump point would
 ;; be added every time you view the jumplist if it were not in
-;; `evil-jumps-ignored-commands'. There is also the
-;; `evil-jumps-ignored-file-patterns' list which prevents setting jump points
+;; `evil-jumps-ignored-commands'. There is also
+;; `evil-jumps-ignored-file-patterns' which prevents setting jump points
 ;; in files matching any of the patterns, and
 ;; `evil-jumps-allowed-buffer-patterns' which allows setting jump points in
 ;; buffers with names that match any of the patterns when the buffer is not
@@ -81,12 +82,12 @@
 ;; windows pop in and out of existence very frequently and there are many cases
 ;; in which a jump point will never be set in a window so this design decision
 ;; seems justified. As an example, there does not seem to be a point in copying
-;; a jumplist to the completions window whenever it pops up.
+;; a jumplist to the *Completions* window whenever it pops up.
 ;;
 ;; The object stored in the `evil-jumplist' parameter is a cons cell,
 ;; (COPY-FLAG . RING), where COPY-FLAG is t if RING must be copied before
-;; setting a new jump point (or modifying RING in any way) in the window. RING
-;; stores the jumplist in the form of a ring data structure.
+;; setting a new jump point in the window or attempting to modify RING in any
+;; way. RING stores the jumplist in the form of a ring data structure.
 ;;
 ;; Navigating through jumps in RING is implemented through ring rotations, i.e.
 ;; deletion of the oldest (newest) element of RING and subsequent insertion as
@@ -101,9 +102,7 @@
 ;; larger than the sentinel are forward jumps. The sentinel value is simply the
 ;; symbol, `evil'. The sentinel also determines the two states that RING can be
 ;; in: if a backward jump has been made between calls to `evil-set-jump' or
-;; not.
-;;
-;; If no backward jumps have been made, the oldest element in RING is the
+;; not. If no backward jumps have been made, the oldest element in RING is the
 ;; sentinel value. Otherwise the oldest element is the most recent backward
 ;; jump.
 ;;
