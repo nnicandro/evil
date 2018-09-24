@@ -412,6 +412,7 @@ DIR is either `forward' or `backward' indicating that rotations
 should be in the forward or backward direction."
   (unless (memq dir '(forward backward))
     (error "Rotation direction can only be `forward' or `backward'"))
+  (evil-maybe-copy-jumplist jumplist)
   (catch 'done
     (let* ((ring (cdr jumplist))
            (oldest (ring-ref ring -1)))
@@ -433,6 +434,7 @@ should be in the forward or backward direction."
 (defun evil-revert-backward-jumps (jumplist)
   "Restore JUMPLIST to a state as if no backward jumps had been performed."
   (when (evil-forward-jumps-p jumplist)
+    (evil-maybe-copy-jumplist jumplist)
     (let ((ring (cdr jumplist)))
       (while (evil--rotate-jumps-forward ring))
       (ring-insert ring (ring-remove ring -1)))))
@@ -528,6 +530,7 @@ Disregard the ID of jump markers when comparing. Two jump markers
 are considered equivalent if they are `equal' or, in the case
 they are both markers, are jump points on the same line in the
 same buffer."
+  (evil-maybe-copy-jumplist jumplist)
   (setq jump (cdr jump))
   (let (beg end)
     (when (markerp jump)
@@ -549,6 +552,7 @@ same buffer."
 A jump is invalid if it doesn't pass `evil-jump-marker-p'. Also
 remove jumps that are considered equivalent, see
 `evil-remove-jump'."
+  (evil-maybe-copy-jumplist jumplist)
   (evil-loop-over-jumps (jumplist jump)
     (and (evil-jump-marker-p jump)
          (prog1 t (evil-remove-jump jumplist jump)))))
@@ -559,8 +563,8 @@ remove jumps that are considered equivalent, see
 ;; jump list so we cannot nil out the marker here.
 (defun evil-push-jump (jumplist jump)
   "In JUMPLIST, remove occurences of JUMP and then insert it."
+  (evil-remove-jump jumplist jump)
   (let ((ring (cdr jumplist)))
-    (evil-remove-jump jumplist jump)
     (when (= (ring-length ring) (ring-size ring))
       ;; Always remove the oldest jump
       (ring-remove ring (1- (ring-member ring 'evil))))
@@ -599,7 +603,6 @@ A copy is necessary when the copy flag of JUMPLIST is t."
   "Jump in DIR COUNT times."
   (or count (setq count 1))
   (let ((jumplist (evil-get-jumplist)))
-    (evil-maybe-copy-jumplist jumplist)
     (evil-remove-invalid-jumps jumplist)
     (let ((ring (cdr jumplist)))
       (evil-motion-loop (nil count)
@@ -626,7 +629,6 @@ If POS is nil, it defaults to `point'."
                   (evil-jump-marker))))
       (unless (or (region-active-p) (evil-visual-state-p))
         (push-mark pos t))
-      (evil-maybe-copy-jumplist jumplist)
       (evil-revert-backward-jumps jumplist)
       (evil-push-jump jumplist jump))))
 
