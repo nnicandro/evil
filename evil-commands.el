@@ -1422,7 +1422,9 @@ the left edge."
 ;;; Operator commands
 
 (evil-define-operator evil-yank (beg end type register yank-handler)
-  "Save the characters in motion into the kill-ring."
+  "Save the characters in motion into the kill-ring.
+Save in REGISTER or in the `kill-ring' with YANK-HANDLER using
+`evil-kill-new'."
   :move-point nil
   :repeat nil
   (interactive "<R><x><y>")
@@ -1459,7 +1461,8 @@ the left edge."
 
 (evil-define-operator evil-delete (beg end type register yank-handler)
   "Delete text from BEG to END with TYPE.
-Save in REGISTER or in the kill-ring with YANK-HANDLER."
+Save in REGISTER or in the `kill-ring' with YANK-HANDLER using
+`evil-kill-new'."
   (interactive "<R><x><y>")
   (when (and (memq type '(inclusive exclusive))
              (not (evil-visual-state-p))
@@ -1478,7 +1481,7 @@ Save in REGISTER or in the kill-ring with YANK-HANDLER."
       (unless (string-match-p "\n" text)
         ;; set the small delete register
         (evil-set-register ?- text))))
-  (let ((evil-is-yank-and-delete t))
+  (let ((this-command 'evil-delete))
     (evil-yank beg end type register yank-handler))
   (cond
    ((eq type 'block)

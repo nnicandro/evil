@@ -2344,32 +2344,51 @@ The tracked insertion is set to `evil-last-insertion'."
 
 ;;; Paste
 
-(defun evil-set-register-on-yank (register text)
-  "Set REGISTER to TEXT.
-Additionally set register 0 and shift the remaining number
-registers if necessary."
-  (when register
-    (evil-set-register register text))
-  (unless (eq register ?_)
-    (evil-set-register ?\" text)
-    (unless (or register evil-is-yank-and-delete)
-      ;; "0 register contains last yanked text
-      (evil-set-register ?0 text)))
-  ;; Handle 1-9 registers when deleting
-  ;; http://vimdoc.sourceforge.net/htmldoc/change.html#registers
-  (when (and evil-is-yank-and-delete
-             (not (eq register ?_))
-             (or (null register)
-                 (memq evil-this-motion evil-special-delete-motions)))
-    (evil-set-register ?1 text))
-  text)
+(defun evil-kill-new (text &optional register)
+  "Like `kill-new', but also handle `evil' registers.
+If REGISTER is provided and it is the black hole register, ?_,
+don't do anything. When REGISTER is not the black hole register,
+store TEXT in the `kill-ring' and if the current command is not
+`evil-delete', store TEXT in the yank register, ?0.
+
+If the current command is `evil-delete', TEXT is considered
+deleted TEXT and will be stored in the first delete register, ?1,
+or the small delete register, ?-, when TEXT is within a line.
+Before TEXT is placed in register ?1, the current contents of the
+delete registers, ?1 thru ?9, will be shifted and the contents of
+oldest register, ?9, dropped if needed.
+
+If REGISTER is provided and is not the black hole register, do
+not store TEXT in the yank or delete registers, only store TEXT
+in REGISTER. As a special case, if the motion used to delete TEXT
+is one of `evil-special-delete-motions', store TEXT in the first
+delete register even when REGISTER is provided. And if TEXT is
+within a line, store it in small delete register as well."
+  (prog1 text
+    (unless (eq register ?_)
+      (kill-new text)
+      (if register (evil-set-register register text)
+        (unless (eq this-command 'evil-delete)
+          ;; set the yank register
+          (evil-set-register ?0 text)))
+      (when (eq this-command 'evil-delete)
+        (let ((delete-motion
+               (memq evil-this-motion evil-special-delete-motions))
+              (within-line (not (string-match-p "\n" text))))
+          (when (or (null register) delete-motion)
+            (when within-line
+              ;; set the small delete register
+              (evil-set-register ?- text))
+            (when (or (not within-line) delete-motion)
+              ;; set the delete register
+              (evil-set-register ?1 text))))))))
 
 (defun evil-yank-characters (beg end &optional register yank-handler)
   "Save the characters defined by the region BEG and END in the kill-ring."
   (let ((text (filter-buffer-substring beg end)))
     (when yank-handler
       (setq text (propertize text 'yank-handler (list yank-handler))))
-    (evil-set-register-on-yank register text)))
+    (evil-kill-new text register)))
 
 (defun evil-yank-lines (beg end &optional register yank-handler)
   "Save the lines in the region BEG and END into the kill-ring."
@@ -2383,7 +2402,7 @@ registers if necessary."
               (/= (aref text (1- (length text))) ?\n))
       (setq text (concat text "\n")))
     (setq text (propertize text 'yank-handler yank-handler))
-    (evil-set-register-on-yank register text)))
+    (evil-kill-new text register)))
 
 (defun evil-yank-rectangle (beg end &optional register yank-handler)
   "Save the rectangle defined by region BEG and END into the kill-ring."
@@ -2402,7 +2421,7 @@ registers if necessary."
                                'evil-delete-yanked-rectangle))
            (text (propertize (mapconcat #'identity lines "\n")
                              'yank-handler yank-handler)))
-      (evil-set-register-on-yank register text))))
+      (evil-kill-new text register))))
 
 (defun evil-remove-yank-excluded-properties (text)
   "Remove `yank-excluded-properties' from TEXT."
