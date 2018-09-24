@@ -343,7 +343,7 @@ the initial input is the visual region '<,'> or `<,`>. The variable
                     (memq (evil-visual-type) '(inclusive exclusive)))
                "`<,`>")
               ((evil-visual-state-p) "'<,'>")
-              (current-prefix-arg
+              ((and current-prefix-arg (not (consp current-prefix-arg)))
                (let ((arg (prefix-numeric-value current-prefix-arg)))
                  (cond ((< arg 0) (setq arg (1+ arg)))
                        ((> arg 0) (setq arg (1- arg))))
