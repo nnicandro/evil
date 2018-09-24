@@ -498,7 +498,7 @@ a call to `evil-merge-jumps-into-frame'.
 
 If FRAME-OR-WINDOW is a window that does not have a jumplist and
 if the `selected-frame's jumplist is non-nil, set the window's
-jumplist as a copy of the `selected-frame''s jumplist and return
+jumplist as a copy of the `selected-frame's jumplist and return
 the copied jumplist. Otherwise make a new empty jumplist for the
 window and return it."
   (or frame-or-window (setq frame-or-window (selected-window)))
