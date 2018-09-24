@@ -400,12 +400,12 @@ Only rotate when the newest element is not the sentinel value."
   (unless (eq (ring-ref ring 0) 'evil)
     (ring-insert-at-beginning ring (ring-remove ring 0))))
 
-(defun evil--rotate-jumps-unless (pred ring dir)
-  "Call PRED on jumps in RING while rotating in DIR.
-RING is rotated in DIR and PRED is called on the oldest element
-of RING. If PRED returns a non-nil value, stop rotating and
+(defun evil-rotate-jumplist (pred jumplist dir)
+  "Call PRED on jumps in JUMPLIST while rotating in DIR.
+JUMPIST is rotated in DIR and PRED is called on the oldest element
+of JUMPLIST. If PRED returns a non-nil value, stop rotating and
 return t. If all possible rotations in DIR were made without PRED
-ever returning a non-nil value, rotate the RING back to the state
+ever returning a non-nil value, rotate JUMPLIST back to the state
 it was in before the call to this function and return nil.
 
 DIR is either `forward' or `backward' indicating that rotations
@@ -413,7 +413,8 @@ should be in the forward or backward direction."
   (unless (memq dir '(forward backward))
     (error "Rotation direction can only be `forward' or `backward'"))
   (catch 'done
-    (let ((oldest (ring-ref ring -1)))
+    (let* ((ring (cdr jumplist))
+           (oldest (ring-ref ring -1)))
       (while (if (eq dir 'backward)
                  (evil--rotate-jumps-backward ring)
                (evil--rotate-jumps-forward ring))
@@ -602,13 +603,13 @@ A copy is necessary when the copy flag of JUMPLIST is t."
     (evil-remove-invalid-jumps jumplist)
     (let ((ring (cdr jumplist)))
       (evil-motion-loop (nil count)
-        (when (evil--rotate-jumps-unless
+        (when (evil-rotate-jumplist
                (if evil-jumps-cross-buffers #'evil-jump-marker-p
                  (apply-partially
                   (lambda (target jump)
                     (string= (evil-jump-marker-target jump) target))
                   (or (buffer-file-name) (buffer-name))))
-               ring dir)
+               jumplist dir)
           (evil--do-jump (ring-ref ring -1)))))))
 
 ;;; Setting a jump point
