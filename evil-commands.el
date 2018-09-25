@@ -3548,15 +3548,17 @@ the previous shell command is executed instead."
             (kill-buffer error-buffer)))))
      (t (shell-command command)))))
 
-(evil-define-command evil-make (arg)
+(evil-define-command evil-make (arg &optional first)
   "Call a build command in the current directory.
 If ARG is nil this function calls `recompile', otherwise it calls
-`compile' passing ARG as build command."
-  (interactive "<sh>")
-  (if (and (fboundp 'recompile)
-           (not arg))
-      (recompile)
-    (compile arg)))
+`compile' passing ARG as build command. If FIRST is non-nil, *do
+not* jump to the first match."
+  (interactive "<sh><!>")
+  (let ((compilation-auto-jump-to-first-error (not first)))
+    (if (and (fboundp 'recompile)
+             (not arg))
+        (recompile)
+      (compile arg))))
 
 ;; TODO: escape special characters (currently only \n) ... perhaps
 ;; there is some Emacs function doing this?
