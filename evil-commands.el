@@ -3560,6 +3560,21 @@ not* jump to the first match."
         (recompile)
       (compile arg))))
 
+(evil-define-command evil-grep (arg &optional first)
+  "Call grep in the current directory.
+If ARG is nil run the most recent `grep' command in the
+`grep-history', otherwise run `grep' with ARG appended to the
+computed `grep-command'. If FIRST is non-nil, *do not* jump to
+the first match. See (info \"grep\")."
+  (interactive "<sh><!>")
+  (let ((compilation-auto-jump-to-first-error (not first)))
+    (if (null arg)
+        (if grep-history
+            (grep (car grep-history))
+          (user-error "No `grep' history"))
+      (grep-compute-defaults)
+      (grep (concat grep-command arg)))))
+
 ;; TODO: escape special characters (currently only \n) ... perhaps
 ;; there is some Emacs function doing this?
 (evil-define-command evil-show-registers (registers)

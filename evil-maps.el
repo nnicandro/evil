@@ -567,6 +567,7 @@ included in `evil-insert-state-bindings' by default."
 (evil-ex-define-cmd "!" 'evil-shell-command)
 (evil-ex-define-cmd "@:" 'evil-ex-repeat)
 (evil-ex-define-cmd "mak[e]" 'evil-make)
+(evil-ex-define-cmd "gre[p]" 'evil-grep)
 (evil-ex-define-cmd "cc" 'evil-goto-error)
 (evil-ex-define-cmd "cfir[st]" 'first-error)
 (evil-ex-define-cmd "cr[ewind]" 'first-error)
