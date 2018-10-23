@@ -239,11 +239,8 @@ skipped over and are left in the jumplist unchanged.
               (,forwardp nil)
               (,filter-fun #',(or (pop spec) 'identity))
               (,fun (lambda ()
-                      (condition-case err
-                          (progn ,@body)
-                        (error
-                         (prog1 t
-                           (message "Error in `evil-loop-over-jumps': %s" err)))))))
+                      (with-demoted-errors "Error in `evil-loop-over-jumps': %S"
+                        ,@body))))
          ;; Find the first jump that is used to determine when to stop
          ;; iterating
          (while (not (or (eq ,jump 'evil) ,pred))
