@@ -161,24 +161,26 @@ the commmand to t using `evil-set-command-property'."
   :group 'evil-jumps)
 
 (defcustom evil-jumps-cross-buffers t
-  "When nil, only jump forward or backward within the current buffer.
-
-If `evil-jumps-cross-buffers' is non-nil, the jump commands can
-jump to positions in other buffers."
+  "When non-nil, jumping can visit locations in other buffers.
+Otherwise jumping is restricted to jump points available for the
+current buffer."
   :type 'boolean
   :group 'evil-jumps)
 
 (defcustom evil-jumps-max-length 100
   "The maximum number of jumps to keep track of."
-  :type 'integer)
+  :type 'integer
+  :group 'evil-jumps)
 
 (defcustom evil-jumps-pre-jump-hook nil
-  "Hooks to run just before jumping to a location in the jump list."
-  :type 'hook)
+  "Hook to run just before jumping to a location in the jump list."
+  :type 'hook
+  :group 'evil-jumps)
 
 (defcustom evil-jumps-post-jump-hook nil
-  "Hooks to run just after jumping to a location in the jump list."
-  :type 'hook)
+  "Hook to run just after jumping to a location in the jump list."
+  :type 'hook
+  :group 'evil-jumps)
 
 (defcustom evil-jumps-ignored-file-patterns '("COMMIT_EDITMSG$" "TAGS$")
   "When `buffer-file-name' matches one of these patterns, jump are inhibited."
@@ -187,7 +189,7 @@ jump to positions in other buffers."
 
 (defcustom evil-jumps-allowed-buffer-patterns '("\\*new\\*" "\\*scratch\\*")
   "When `buffer-name' matches one of these patterns, jumps are allowed.
-These patterns only checked when the `current-buffer' has no
+These patterns are only checked when the `current-buffer' has no
 `buffer-file-name'."
   :type '(repeat string)
   :group 'evil-jumps)
@@ -212,8 +214,8 @@ These patterns only checked when the `current-buffer' has no
   "Loop over the JUMP's of JUMPLIST.
 For each iteration: bind a jump marker to JUMP, set FORWARDP to t
 if JUMP is a forward jump otherwise set it to nil, evaluate BODY.
-If BODY returns non-nil keep JUMP in JUMPLIST, otherwise remove
-JUMP from JUMPLIST.
+If BODY evaluates to a non-nil value keep JUMP in JUMPLIST,
+otherwise remove JUMP from JUMPLIST.
 
 If FILTER is non-nil it is a function that takes a single
 argument, a jump marker. Only iterate over the jumps that cause
@@ -281,19 +283,19 @@ Otherwise use JUMP."
   (cons (cl-incf evil-global-jump-id) jump))
 
 (defun evil-jump-marker-id (marker)
-  "Get the ID of MARKER.
+  "Return the ID of a jump MARKER.
 The jump ID serves as a way to order the jumps when merging
 jumplists of two windows."
   (car-safe marker))
 
 (defun evil-jump-marker-position (marker)
-  "Get the position of a jump MARKER."
+  "Return the position of a jump MARKER."
   (if (markerp (cdr-safe marker))
       (marker-position (cdr marker))
     (car-safe (cdr-safe marker))))
 
 (defun evil-jump-marker-target (marker)
-  "Get the file or buffer name of a jump MARKER."
+  "Return the file or buffer name of a jump MARKER."
   (if (markerp (cdr-safe marker))
       (let ((buffer (marker-buffer (cdr marker))))
         (or (buffer-file-name buffer)
@@ -301,13 +303,13 @@ jumplists of two windows."
     (cdr-safe (cdr-safe marker))))
 
 (defun evil-jump-target-p (item)
-  "Is ITEM a valid jump target? If ITEM is a buffer with no
-`buffer-file-name', then its `buffer-name' must match
-`evil-jumps-allowed-buffer-patterns' to be a valid jump target.
-Or if the buffer has a file name, then the file name must not
-match one of `evil-jumps-ignored-file-patterns' and must point to
-an existing file. In the case that the current buffer is visiting
-a remote file, the file existence check is not performed."
+  "Return non-nil if ITEM is a valid jump target.
+If ITEM is a buffer with no file name then its `buffer-name' must
+match `evil-jumps-allowed-buffer-patterns' to be a valid jump
+target. If ITEM does have a file name, then the file name must
+not match one of `evil-jumps-ignored-file-patterns' and must
+point to an existing file. In the case that the file points to a
+remote file, the file existence check is not performed."
   (let* ((buffer (or (and (stringp item) (get-buffer item))
                      (and (bufferp item) item)))
          (path (or (and buffer (buffer-file-name
@@ -324,7 +326,7 @@ a remote file, the file existence check is not performed."
          thereis (string-match-p pattern (buffer-name buffer)))))))
 
 (defun evil-jump-marker-p (marker)
-  "Is MARKER a valid jump marker?
+  "Return non-nil if MARKER is a jump marker.
 A jump marker is a cons cell
 
      (ID . MARKER) or (ID POS . PATH)
@@ -339,14 +341,14 @@ depending on if there is a buffer visiting the jump or not."
 (defun evil-swap-out-jump-markers (&optional make-markers frame-or-window)
   "Convert jump markers to (POS . PATH) pairs.
 Markers are converted only if the `current-buffer' is visiting a
-file and the current jump list has jumps with targets to the
-`current-buffer'. If MAKE-MARKERS is non-nil, then convert
+file and the current jump list has jumps in the `current-buffer'.
+If MAKE-MARKERS is non-nil, then convert
 
     (POS . PATH)
 
 pairs to markers instead. If FRAME-OR-WINDOW is non-nil, then
-swap out markers for FRAME-OR-WINDOW's jumplist. If
-FRAME-OR-WINDOW is nil, default to the `selected-window'."
+swap out markers for FRAME-OR-WINDOW's jumplist, default to the
+`selected-window' if FRAME-OR-WINDOW is nil"
   (or frame-or-window (setq frame-or-window (selected-window)))
   ;; Can't swap out markers of buffer targets, i.e. buffers with a nil
   ;; `buffer-file-name' so ignore them.
@@ -382,11 +384,10 @@ for the `current-buffer'. MAKE-MARKERS has the same meaning as in
 (defun evil--rotate-jumps-forward (ring)
   "Make the oldest element of RING the newest.
 Only rotate when the first or second oldest element is not the
-sentinel value.
-
-Note that we use the second oldest element to distinguish between
-a ring in which at least one backward rotation has been performed
-and one in which no backward rotations have been performed."
+sentinel value."
+  ;; Note that we use the second oldest element to distinguish between a ring
+  ;; in which at least one backward rotation has been performed and one in
+  ;; which no backward rotations have been performed.
   (unless (or (eq (ring-ref ring -2) 'evil)
               (eq (ring-ref ring -1) 'evil))
     (ring-insert ring (ring-remove ring -1))))
@@ -439,14 +440,14 @@ should be in the forward or backward direction."
 ;;; Accessing the jumplist
 
 (defun evil-jumplist-p (thing)
-  "Is THING a jumplist?"
+  "Return non-nil if THING is a jumplist."
   (and (consp thing)
        (booleanp (car thing))
        (ringp (cdr thing))
        (ring-member (cdr thing) 'evil)))
 
 (defun evil-forward-jumps-p (jumplist)
-  "Does JUMPLIST have forward jumps?"
+  "Return non-nil if JUMPLIST has forward jumps."
   (not (eq (ring-ref (cdr jumplist) -1) 'evil)))
 
 (defun evil-current-jumps (&optional frame-or-window)
