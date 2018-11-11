@@ -1,7 +1,7 @@
 ;;; evil-jumps.el --- Jump list implementation  -*-
 
 ;; Author: Nathaniel Nicandro <nathanielnicandro at gmail.com>
-;;         Bailey Ling <bling at live.ca>
+;; Original Author: Bailey Ling <bling at live.ca>
 ;;
 
 ;; Version: 1.15.0
@@ -100,34 +100,38 @@
 ;; before any jumps are added, and acts to orient the jumps in RING. All jumps
 ;; with indices less than the index of the sentinel are backward jumps, indices
 ;; larger than the sentinel are forward jumps. The sentinel value is simply the
-;; symbol, `evil'. The sentinel also determines the two states that RING can be
-;; in: if a backward jump has been made between calls to `evil-set-jump' or
-;; not. If no backward jumps have been made, the oldest element in RING is the
-;; sentinel value. Otherwise the oldest element is the most recent backward
-;; jump.
+;; symbol, `evil'.
+;;
+;; The sentinel also determines the two states that RING can be in: if a
+;; backward jump has been made between calls to `evil-set-jump' or not. If no
+;; backward jumps have been made, the oldest element in RING is the sentinel
+;; value. Otherwise the oldest element is the most recent backward jump.
 ;;
 ;; So for example if RING is
 ;;
 ;;     (A B C ... evil)
 ;;
-;; where no backward jumps have been made and A is the most recently set jump.
-;; Then after a backward jump to A, we would have
+;; then no backward jumps have been made and A is the most recently set jump.
+;; Then after a backward jump to A, RING would look like
 ;;
 ;;     (B C ... evil A)
 ;;
-;; One more backward jump and we would have
+;; After one more backward jump, RING would look like
 ;;
 ;;     (C ... evil A B)
 ;;
-;; with `point' at the location specified by B. Making a forward jump to A, we
-;; would have
+;; with `point' at the location specified by B. Making a forward jump to A,
+;; RING would become
 ;;
 ;;     (B C ... evil A)
 ;;
 ;; Since A is the most recently set jump, there are no more forward jumps that
 ;; can be made and additional attempts to jump forward will leave RING in the
 ;; same state. Notice that after each forward/backward jump, `point' is left at
-;; the location specified by the oldest element of RING.
+;; the location specified by the oldest element of RING. It looks like we have
+;; found something pretty close to being an invariant in this representation of
+;; a jumplist. After every jumplist operation, the oldest element of RING will
+;; be the most recently jumped to location.
 ;;
 ;; When a new jump point is set, regardles of which jump point is the most
 ;; recently visited, RING is reset to the state where the sentinel is the
