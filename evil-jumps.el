@@ -404,9 +404,10 @@ Only rotate when the newest element is not the sentinel value."
 
 (defun evil-rotate-jumplist (pred jumplist dir)
   "Call PRED on jumps in JUMPLIST while rotating in DIR.
-JUMPIST is rotated in DIR and PRED is called on the oldest element
-of JUMPLIST. If PRED returns a non-nil value, stop rotating and
-return t. If all possible rotations in DIR were made without PRED
+JUMPLIST is rotated in DIR and PRED is called on the oldest
+element of JUMPLIST. If PRED returns a non-nil value, stop
+rotating and return the element that caused PRED to return
+non-nil. If all possible rotations in DIR were made without PRED
 ever returning a non-nil value, rotate JUMPLIST back to the state
 it was in before the call to this function and return nil.
 
@@ -425,7 +426,7 @@ should be in the forward or backward direction."
         ;; the jump that should be performed.
         (let ((jump (ring-ref ring -1)))
           (when (funcall pred jump)
-            (throw 'done t))))
+            (throw 'done jump))))
       ;; Restore the jumplist when PRED does not return a non-nil value and we
       ;; have rotated as far as we can
       (while (not (eq (ring-ref ring -1) oldest))
@@ -606,16 +607,16 @@ A copy is necessary when the copy flag of JUMPLIST is t."
   (or count (setq count 1))
   (let ((jumplist (evil-get-jumplist)))
     (evil-remove-invalid-jumps jumplist)
-    (let ((ring (cdr jumplist)))
-      (evil-motion-loop (nil count)
-        (when (evil-rotate-jumplist
-               (if evil-jumps-cross-buffers #'evil-jump-marker-p
-                 (apply-partially
-                  (lambda (target jump)
-                    (string= (evil-jump-marker-target jump) target))
-                  (or (buffer-file-name) (buffer-name))))
-               jumplist dir)
-          (evil--do-jump (ring-ref ring -1)))))))
+    (evil-motion-loop (nil count)
+      (let* ((pred (if evil-jumps-cross-buffers #'evil-jump-marker-p
+                     (apply-partially
+                      (lambda (target jump)
+                        (and (evil-jump-marker-p jump)
+                             (string= (evil-jump-marker-target jump) target)))
+                      (or (buffer-file-name) (buffer-name)))))
+             (jump (evil-rotate-jumplist pred jumplist dir)))
+        (when jump
+          (evil--do-jump jump))))))
 
 ;;; Setting a jump point
 
