@@ -505,11 +505,11 @@ jumplist as a copy of the `selected-frame's jumplist and return
 the copied jumplist. Otherwise make a new empty jumplist for the
 window and return it."
   (or frame-or-window (setq frame-or-window (selected-window)))
-  (let ((jumplist (funcall (if (framep frame-or-window)
-                               #'frame-parameter
-                             #'window-parameter)
-                           frame-or-window
-                           'evil-jumplist)))
+  (let ((jumplist (cond
+                   ((framep frame-or-window)
+                    (frame-parameter frame-or-window 'evil-jumplist))
+                   ((windowp frame-or-window)
+                    (window-parameter frame-or-window 'evil-jumplist)))))
     (or jumplist
         (cond
          ((windowp frame-or-window)
