@@ -588,9 +588,9 @@ A copy is necessary when the copy flag of JUMPLIST is t."
   "Set the `current-buffer' and `point' depending on JUMP."
   (let ((evil-jumping-p t)
         (do-jump
-         (lambda (f target position)
+         (lambda (set-buf target position)
            (run-hooks 'evil-jumps-pre-jump-hook)
-           (funcall f target)
+           (funcall set-buf target)
            (goto-char position)
            (run-hooks 'evil-jumps-post-jump-hook))))
     (pcase jump
