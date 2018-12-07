@@ -54,15 +54,17 @@
      (line #'evil-goto-line)
      (sexp #'eval-expression))
     (pipe-expression
-     (pipe pipe-expression #''$2)
-     (count pipe-command pipe-argument pipe-expression #'evil-ex-pipe-command)
-     ((\? range) pipe-command pipe-argument pipe-expression #'evil-ex-pipe-command)
-     (line pipe-expression #'(evil-ex-pipe-sexp '(evil-goto-line $1) $3))
-     (sexp pipe-expression #'evil-ex-pipe-sexp)
+     (count pipe-command pipe-argument pipe pipe-expression
+            #'(evil-ex-pipe-command $1 $2 $3 '$5))
+     ((\? range) pipe-command pipe-argument pipe pipe-expression
+      #'(evil-ex-pipe-command $1 $2 $3 '$5))
+     (line pipe pipe-expression #'(evil-ex-pipe-sexp '(evil-goto-line $1) '$3))
+     (sexp pipe pipe-expression #'(evil-ex-pipe-sexp $1 '$3))
      expression)
     (count
      number)
     (command #'evil-ex-parse-command)
+    (pipe-command #'evil-ex-parse-pipe-command)
     (binding
      "[~&*@<>=:]+\\|[[:alpha:]_]+\\|!")
     (emacs-binding
@@ -295,48 +297,6 @@ Return nil if CMD is not a valid command."
     (when cmd
       (evil-get-command-property cmd :bar t))))
 
-(defun evil-ex-valid-pipe-tree-p (tree)
-  (or (eq (car-safe tree) 'expression)
-      (and (eq (car-safe tree) 'pipe-expression)
-           (memq (caar (last tree)) '(pipe-expression expression))
-           (or (memq (car-safe (nth 1 tree)) '(sexp line))
-               (evil-ex-pipe-command-p (cadr (nth 2 tree)))))))
-
-(defun evil-ex-extract-disallowed-pipe (tree)
-  "Return a list, (PIPE TAIL), of expressions contained in TREE.
-TAIL is the first command in the pipe chain expressed in TREE
-that considers | as part of its argument. The pipe chain leading
-up to TAIL will be contained in PIPE and excludes TAIL."
-  (let ((head tree))
-    (cond
-     ((and (eq (car-safe tree) 'pipe-expression)
-           (progn
-             (while (evil-ex-valid-pipe-tree-p tree)
-               (setq tree (car (last tree))))
-             (eq (car tree) 'pipe-expression)))
-      (list (cl-sublis `((,tree . nil)) head) tree))
-     (t (list head nil)))))
-
-(defun evil-ex-rewrite-pipe-expression (tree)
-  "Return a form to evaluate constructed from TREE that considers pipe commands.
-TREE is a parse tree as returned by `evil-parser'. Extract the
-part of TREE that corresponds to the first invalid pipe command,
-i.e. a command with a nil :bar property, and return a form that
-does the proper evaluations."
-  ;; FIXME: This should probably be baked into the parser as a
-  ;; semantic action, but the issue is that the parser will have
-  ;; already parsed everything after a command which shouldn't take a
-  ;; pipe. If there is a way to store the substring after a parsed
-  ;; expression that would be great.
-  (append (list 'progn)
-          (cl-destructuring-bind (pipe tail)
-              (evil-ex-extract-disallowed-pipe tree)
-            (list
-             (evil-ex-parse
-              (evil-ex-deparse-syntax-tree pipe) nil 'pipe-expression)
-             (evil-ex-parse
-              (evil-ex-deparse-syntax-tree tail))))))
-
 (defun evil-ex-non-pipe-tree (tree)
   "Return the subtree of the Ex parse TREE that does not correspond to a pipe."
   (while (eq (car tree) 'pipe-expression)
@@ -396,9 +356,7 @@ in case of incomplete or unknown commands."
             ;; `evil-ex-execute', every other ex variable set besides this one
             ;; is for the purposes of completion which needs to be the last
             ;; non-pipe expression.
-            evil-ex-expression (if (not (eq (car-safe (nth 1 root-tree)) 'pipe-expression))
-                                   root-expr
-                                 (evil-ex-rewrite-pipe-expression root-tree))
+            evil-ex-expression root-expr
             evil-ex-range range
             evil-ex-cmd cmd
             evil-ex-bang bang
@@ -1007,6 +965,12 @@ START is the start symbol, which defaults to `expression'."
               string (cdr-safe result)
               command (concat command bang)))
       (cons command string))))
+
+(defun evil-ex-parse-pipe-command (string)
+  "Parse STRING as an Ex binding that can have piped commands after it."
+  (let ((result (evil-ex-parse-command string)))
+    (when (and result (evil-ex-pipe-command-p (car result)))
+      result)))
 
 (defun evil-ex-command-force-p (command)
   "Whether COMMAND accepts the bang argument."
