@@ -53,6 +53,13 @@
      ((\? range) command argument #'evil-ex-call-command)
      (line #'evil-goto-line)
      (sexp #'eval-expression))
+    (pipe-expression
+     (pipe pipe-expression #''$2)
+     (count pipe-command pipe-argument pipe-expression #'evil-ex-pipe-command)
+     ((\? range) pipe-command pipe-argument pipe-expression #'evil-ex-pipe-command)
+     (line pipe-expression #'(evil-ex-pipe-sexp '(evil-goto-line $1) $3))
+     (sexp pipe-expression #'evil-ex-pipe-sexp)
+     expression)
     (count
      number)
     (command #'evil-ex-parse-command)
@@ -62,6 +69,10 @@
      "[[:alpha:]-][[:alnum:][:punct:]-]+")
     (bang
      (\? (! space) "!" #'$1))
+    (pipe
+     ((\? space) "|" (\? space)))
+    (pipe-argument
+     ((\? space) (\? "\\(?:[^\\| ]\\|\n\\|\\\\[^|]\\)+") #'$2))
     (argument
      ((\? space) (\? "\\(?:.\\|\n\\)+") #'$2))
     (range
@@ -275,6 +286,70 @@ Clean up everything set up by `evil-ex-setup'."
         (funcall runner 'stop)))))
 (put 'evil-ex-teardown 'permanent-local-hook t)
 
+(defun evil-ex-pipe-command-p (cmd)
+  "Return the :bar property of CMD.
+Return nil if CMD is not a valid command."
+  (when (or (symbolp cmd) (stringp cmd))
+    (unless (symbolp cmd)
+      (setq cmd (evil-ex-binding cmd 'noerror)))
+    (when cmd
+      (evil-get-command-property cmd :bar t))))
+
+(defun evil-ex-valid-pipe-tree-p (tree)
+  (or (eq (car-safe tree) 'expression)
+      (and (eq (car-safe tree) 'pipe-expression)
+           (memq (caar (last tree)) '(pipe-expression expression))
+           (or (memq (car-safe (nth 1 tree)) '(sexp line))
+               (evil-ex-pipe-command-p (cadr (nth 2 tree)))))))
+
+(defun evil-ex-extract-disallowed-pipe (tree)
+  "Return a list, (PIPE TAIL), of expressions contained in TREE.
+TAIL is the first command in the pipe chain expressed in TREE
+that considers | as part of its argument. The pipe chain leading
+up to TAIL will be contained in PIPE and excludes TAIL."
+  (let ((head tree))
+    (cond
+     ((and (eq (car-safe tree) 'pipe-expression)
+           (progn
+             (while (evil-ex-valid-pipe-tree-p tree)
+               (setq tree (car (last tree))))
+             (eq (car tree) 'pipe-expression)))
+      (list (cl-sublis `((,tree . nil)) head) tree))
+     (t (list head nil)))))
+
+(defun evil-ex-rewrite-pipe-expression (tree)
+  "Return a form to evaluate constructed from TREE that considers pipe commands.
+TREE is a parse tree as returned by `evil-parser'. Extract the
+part of TREE that corresponds to the first invalid pipe command,
+i.e. a command with a nil :bar property, and return a form that
+does the proper evaluations."
+  ;; FIXME: This should probably be baked into the parser as a
+  ;; semantic action, but the issue is that the parser will have
+  ;; already parsed everything after a command which shouldn't take a
+  ;; pipe. If there is a way to store the substring after a parsed
+  ;; expression that would be great.
+  (append (list 'progn)
+          (cl-destructuring-bind (pipe tail)
+              (evil-ex-extract-disallowed-pipe tree)
+            (list
+             (evil-ex-parse
+              (evil-ex-deparse-syntax-tree pipe) nil 'pipe-expression)
+             (evil-ex-parse
+              (evil-ex-deparse-syntax-tree tail))))))
+
+(defun evil-ex-non-pipe-tree (tree)
+  "Return the subtree of the Ex parse TREE that does not correspond to a pipe."
+  (while (eq (car tree) 'pipe-expression)
+    (setq tree (car (last tree))))
+  tree)
+
+(defun evil-ex-non-pipe-expression (expr)
+  "Return the first command in EXPR that is not piped."
+  (while (memq (car-safe expr) '(evil-ex-pipe-command
+                                 evil-ex-pipe-sexp))
+    (setq expr (evil-unquote (car (last expr)))))
+  expr)
+
 (defun evil-ex-update (&optional beg end len string)
   "Update Ex variables when the minibuffer changes.
 This function is usually called from `after-change-functions'
@@ -283,13 +358,15 @@ hook. If BEG is non-nil (which is the case when called from
 in case of incomplete or unknown commands."
   (let* ((prompt (minibuffer-prompt-end))
          (string (or string (buffer-substring prompt (point-max))))
-         arg bang cmd count expr func handler range tree type)
-    (if (and (eq this-command #'self-insert-command)
-             (commandp (setq cmd (lookup-key evil-ex-map string))))
-        (progn
-          (setq evil-ex-expression `(call-interactively #',cmd))
-          (when (minibufferp)
-            (exit-minibuffer)))
+         arg bang cmd count root-expr expr
+         func handler range root-tree tree type)
+    (cond
+     ((and (eq this-command #'self-insert-command)
+           (commandp (setq cmd (lookup-key evil-ex-map string))))
+      (setq evil-ex-expression `(call-interactively #',cmd))
+      (when (minibufferp)
+        (exit-minibuffer)))
+     (t
       (setq cmd nil)
       ;; store the buffer position of each character
       ;; as the `ex-index' text property
@@ -297,8 +374,12 @@ in case of incomplete or unknown commands."
         (add-text-properties
          i (1+ i) (list 'ex-index (+ i prompt)) string))
       (with-current-buffer evil-ex-current-buffer
-        (setq tree (evil-ex-parse string t)
-              expr (evil-ex-parse string))
+        (setq root-expr (evil-ex-parse string nil 'pipe-expression)
+              root-tree (evil-ex-parse string t 'pipe-expression)
+              ;; For the purposes of completion, we need the last non-pipe
+              ;; expression.
+              expr (evil-ex-non-pipe-expression root-expr)
+              tree (evil-ex-non-pipe-tree root-tree))
         (when (eq (car-safe expr) 'evil-ex-call-command)
           (setq count (eval (nth 1 expr))
                 cmd (eval (nth 2 expr))
@@ -310,7 +391,14 @@ in case of incomplete or unknown commands."
                         (evil-ex-range count count)))
                 bang (and (save-match-data (string-match ".!$" cmd)) t))))
       (setq evil-ex-tree tree
-            evil-ex-expression expr
+            ;; The whole expression is needed here for the purposes of
+            ;; evaluation later on in either `evil-ex-repeat' or
+            ;; `evil-ex-execute', every other ex variable set besides this one
+            ;; is for the purposes of completion which needs to be the last
+            ;; non-pipe expression.
+            evil-ex-expression (if (not (eq (car-safe (nth 1 root-tree)) 'pipe-expression))
+                                   root-expr
+                                 (evil-ex-rewrite-pipe-expression root-tree))
             evil-ex-range range
             evil-ex-cmd cmd
             evil-ex-bang bang
@@ -345,7 +433,7 @@ in case of incomplete or unknown commands."
           (let ((n (length (all-completions cmd (evil-ex-completion-table)))))
             (cond
              ((> n 1) (evil-ex-echo "Incomplete command"))
-             ((= n 0) (evil-ex-echo "Unknown command"))))))))))
+             ((= n 0) (evil-ex-echo "Unknown command")))))))))))
 (put 'evil-ex-update 'permanent-local-hook t)
 
 (defun evil-ex-echo (string &rest args)
@@ -749,6 +837,20 @@ This function interprets special file names like # and %."
           (with-current-buffer buf
             (deactivate-mark)))))))
 
+(defun evil-ex-pipe-command (range command argument &optional pipe-command)
+  "Execute the given command COMMAND, then PIPE-COMMAND.
+PIPE-COMMAND is a form to evaluate."
+  (evil-ex-call-command range command argument)
+  (when pipe-command
+    (eval pipe-command)))
+
+(defun evil-ex-pipe-sexp (sexp &optional pipe-command)
+  "Evaluate SEXP, then PIPE-COMMAND.
+PIPE-COMMAND is a form to evaluate."
+  (eval-expression sexp)
+  (when pipe-command
+    (eval pipe-command)))
+
 (defun evil-ex-line (base &optional offset)
   "Return the line number of BASE plus OFFSET."
   (+ (or base (line-number-at-pos))
@@ -911,6 +1013,15 @@ START is the start symbol, which defaults to `expression'."
   (let ((binding (evil-ex-completed-binding command t)))
     (when binding
       (evil-get-command-property binding :ex-bang))))
+
+(defun evil-ex-deparse-syntax-tree (tree)
+  "Re-construct the Ex command string from TREE."
+  (cond
+   ((listp tree)
+    (cl-loop
+     for el in (cdr tree)
+     concat (evil-ex-deparse-syntax-tree el)))
+   ((stringp tree) tree)))
 
 (defun evil-flatten-syntax-tree (tree)
   "Find all paths from the root of TREE to its leaves.
