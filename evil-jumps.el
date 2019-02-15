@@ -795,9 +795,9 @@ the new window is a shallow copy of the jumplist in the window
 being split. Return the newly splitted window."
   (evil-set-jump)
   (let* ((window (ad-get-arg 0))
-        (jumplist (when (evil-get-jumplist window)
-                    (cons t (cdr (evil-get-jumplist window)))))
-        (new-window ad-do-it))
+         (jumplist (when (evil-get-jumplist window)
+                     (cons t (cdr (evil-get-jumplist window)))))
+         (new-window ad-do-it))
     (prog1 new-window
       (set-window-parameter new-window 'evil-jumplist jumplist))))
 
