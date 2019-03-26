@@ -448,7 +448,7 @@ should be in the forward or backward direction."
   "Return non-nil if THING is a jumplist."
   (and (consp thing)
        (booleanp (car thing))
-       (ringp (cdr thing))
+       (ring-p (cdr thing))
        (ring-member (cdr thing) 'evil)))
 
 (defun evil-forward-jumps-p (jumplist)
