@@ -1,5 +1,6 @@
 language: generic
 sudo: true
+dist: trusty
 
 env:
   global:
@@ -18,6 +19,13 @@ matrix:
 before_install:
   - sudo apt-get update
   - sudo apt-get install -y aspell aspell-en # required for flyspell test
+  - sudo apt-get install -y gdb
+
+before_script:
+  - ulimit -c unlimited -S
+  - ulimit -s unlimited
+  - ulimit -v unlimited
+  - ulimit -m unlimited
 
 install:
   - $CURL -O https://github.com/npostavs/emacs-travis/releases/download/bins/emacs-bin-${EMACS_VERSION}.tar.gz
@@ -33,3 +41,7 @@ notifications:
     # Default is change, but that includes a new branch's 1st success.
     on_success: never
     on_failure: always
+
+after_failure:
+  - COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1)
+  - if [[ -f "$COREFILE" ]]; then gdb -c "$COREFILE" /tmp/emacs/bin/emacs -ex "thread apply all bt" -ex "set pagination 0" -batch; fi
