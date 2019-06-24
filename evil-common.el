@@ -1350,7 +1350,8 @@ last successful match (that caused COUNT to reach zero)."
   ;; Always use the default `forward-sexp-function'. This is important
   ;; for modes that use a custom one like `python-mode'.
   ;; (addresses #364)
-  (let (forward-sexp-function)
+  (let (forward-sexp-function
+        parse-sexp-lookup-properties)
     (with-syntax-table (copy-syntax-table (syntax-table))
       (modify-syntax-entry open (format "(%c" close))
       (modify-syntax-entry close (format ")%c" open))
