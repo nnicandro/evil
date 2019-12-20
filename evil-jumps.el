@@ -215,15 +215,19 @@ These patterns are only checked when the `current-buffer' has no
 
 (defmacro evil-loop-over-jumps (spec &rest body)
   "Loop over the JUMP's of JUMPLIST.
-For each iteration: bind a jump marker to JUMP, set FORWARDP to t
-if JUMP is a forward jump otherwise set it to nil, evaluate BODY.
-If BODY evaluates to a non-nil value keep JUMP in JUMPLIST,
-otherwise remove JUMP from JUMPLIST.
+JUMP should be a symbol whose value will be bound to a jump
+marker of JUMPLIST. If FORWARDP is non-nil, it should be another
+symbol this time bound to t if the marker is an element of the
+stack of previously visited markers. The previously mentioned
+symbols will be bound to different values for each iteration over
+JUMPLIST.
 
-If FILTER is non-nil it is a function that takes a single
-argument, a jump marker. Only iterate over the jumps that cause
-FILTER to return non-nil. The jumps that do not pass FILTER are
-skipped over and are left in the jumplist unchanged.
+If BODY evaluates to a non-nil value after each iteration keep
+the jump marker in JUMPLIST, otherwise remove the marker.
+
+If FILTER is provided it should be a predicate function that
+takes a marker as argument. Skip over those markers that do not
+pass FILTER.
 
 \(fn (JUMPLIST JUMP &optional FORWARDP FILTER) BODY...)"
   (declare (indent defun)
