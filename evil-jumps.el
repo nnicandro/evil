@@ -360,8 +360,8 @@ swap out markers for FRAME-OR-WINDOW's jumplist, default to the
   ;; Can't swap out markers of buffer targets, i.e. buffers with a nil
   ;; `buffer-file-name' so ignore them.
   (when (and buffer-file-name (evil-jump-target-p (current-buffer)))
-    (evil-maybe-copy-jumplist (evil-get-jumplist frame-or-window))
-    (evil-loop-over-jumps ((evil-get-jumplist frame-or-window) jump nil
+    (evil-maybe-copy-jumplist (evil-jumplist frame-or-window))
+    (evil-loop-over-jumps ((evil-jumplist frame-or-window) jump nil
                            (lambda (jump)
                              (string= (evil-jump-marker-target jump)
                                       buffer-file-name)))
@@ -482,31 +482,23 @@ As a special case, if FRAME-OR-WINDOW is a jumplist return its
 jumps."
   (let ((jumplist (if (evil-jumplist-p frame-or-window)
                       frame-or-window
-                    (evil-get-jumplist frame-or-window))))
+                    (evil-jumplist frame-or-window))))
     (let (forward-jumps backward-jumps)
       (evil-loop-over-jumps (jumplist jump forwardp)
         (push jump (if forwardp forward-jumps backward-jumps)))
       (list (nreverse forward-jumps) (nreverse backward-jumps)))))
 
-(defun evil-get-jumplist (&optional frame-or-window)
-  "Get the jumplist for FRAME-OR-WINDOW.
-Return the jumplist stored in the `evil-jumplist' frame/window
-parameter of FRAME-OR-WINDOW.
+(defun evil-jumplist (&optional frame-or-window)
+  "Return the jumplist of FRAME-OR-WINDOW.
+If FRAME-OR-WINDOW is a frame without a jumplist, return nil.
 
-The returned jumplist is a cons cell (COPY-FLAG . RING) where
-COPY-FLAG is a flag variable determining if RING should be copied
-before attempting to modify RING. RING is the ring data structure
-holding the jump points for FRAME-OR-WINDOW.
+If FRAME-OR-WINDOW is a window without a jumplist, set it to a
+copy of the `selected-frame's jumplist and return it.  If the
+`selected-frame' has no jumplist, make an empty jumplist for the
+window and return it.
 
-If FRAME-OR-WINDOW is a frame that does not have a jumplist,
-return nil. Note that a frame's jumplist is updated only through
-a call to `evil-merge-jumps-into-frame'.
-
-If FRAME-OR-WINDOW is a window that does not have a jumplist and
-if the `selected-frame's jumplist is non-nil, set the window's
-jumplist as a copy of the `selected-frame's jumplist and return
-the copied jumplist. Otherwise make a new empty jumplist for the
-window and return it."
+If FRAME-OR-WINDOW is nil or empty, the jumplist of the
+`selected-window' is returned."
   (or frame-or-window (setq frame-or-window (selected-window)))
   (let ((jumplist (cond
                    ((framep frame-or-window)
@@ -516,7 +508,7 @@ window and return it."
     (or jumplist
         (cond
          ((windowp frame-or-window)
-          (setq jumplist (cdr-safe (evil-get-jumplist
+          (setq jumplist (cdr-safe (evil-jumplist
                                     (window-frame frame-or-window))))
           (set-window-parameter
            frame-or-window 'evil-jumplist
@@ -608,7 +600,7 @@ A copy is necessary when the copy flag of JUMPLIST is t."
 (defun evil--jump (dir count)
   "Jump in DIR COUNT times."
   (or count (setq count 1))
-  (let ((jumplist (evil-get-jumplist)))
+  (let ((jumplist (evil-jumplist)))
     (evil-remove-invalid-jumps jumplist)
     (evil-motion-loop (nil count)
       (let* ((pred (if evil-jumps-cross-buffers #'evil-jump-marker-p
@@ -629,7 +621,7 @@ If POS is nil, it defaults to `point'."
   (unless (or evil-jumping-p
               (memq this-command evil-jumps-ignored-commands)
               (not (evil-jump-target-p (current-buffer))))
-    (let ((jumplist (evil-get-jumplist))
+    (let ((jumplist (evil-jumplist))
           (jump (save-excursion
                   (when pos (goto-char pos))
                   (evil-jump-marker))))
@@ -653,7 +645,7 @@ If POS is nil, it defaults to `point'."
 (evil-define-command evil-show-jumps ()
   "Display the jump list."
   :repeat nil
-  (evil-remove-invalid-jumps (evil-get-jumplist))
+  (evil-remove-invalid-jumps (evil-jumplist))
   (let* ((index 1)
          (jumps (cl-destructuring-bind (forward-jumps backward-jumps)
                     (evil-current-jumps)
@@ -712,7 +704,7 @@ If POS is nil, it defaults to `point'."
       (beginning-of-line))))
 
 (defun evil--show-jumps-select-action (row)
-  "Jump to the location corresponding ROW."
+  "Jump to the location corresponding to jump point in ROW."
   (quit-window 'kill)
   (let* ((jump (get-text-property 0 'evil-jump (elt row 2))))
     (evil--do-jump jump)))
@@ -752,7 +744,7 @@ INDEX equal to 0."
   ;; If loading from history, reset the frame's jumplist as well
   (set-frame-parameter nil 'evil-jumplist nil)
   (set-window-parameter nil 'evil-jumplist nil)
-  (let ((jumplist (evil-get-jumplist)))
+  (let ((jumplist (evil-jumplist)))
     (cl-loop
      for jump in (reverse evil-jump-history)
      do (evil-push-jump jumplist (evil-jump-marker jump)))
@@ -768,7 +760,7 @@ INDEX equal to 0."
   (walk-windows
    (lambda (window)
      (evil-merge-jumps-into-frame window (selected-frame))))
-  (evil-remove-invalid-jumps (evil-get-jumplist (selected-frame)))
+  (evil-remove-invalid-jumps (evil-jumplist (selected-frame)))
   (setq evil-jump-history
         (let ((jumps (cl-destructuring-bind (forward-jumps backward-jumps)
                          (evil-current-jumps (selected-frame))
@@ -799,8 +791,8 @@ the new window is a shallow copy of the jumplist in the window
 being split. Return the newly splitted window."
   (evil-set-jump)
   (let* ((window (ad-get-arg 0))
-         (jumplist (when (evil-get-jumplist window)
-                     (cons t (cdr (evil-get-jumplist window)))))
+         (jumplist (when (evil-jumplist window)
+                     (cons t (cdr (evil-jumplist window)))))
          (new-window ad-do-it))
     (prog1 new-window
       (set-window-parameter new-window 'evil-jumplist jumplist))))
@@ -843,13 +835,13 @@ merged jumplists."
   "Merge WINDOW's jumplist into FRAME's jumplist.
 Perform the merge only when WINDOW's jumplist is not a copy of
 another window's jumplist."
-  (unless (car (evil-get-jumplist window))
+  (unless (car (evil-jumplist window))
     (set-frame-parameter
      frame 'evil-jumplist
-     (if (null (evil-get-jumplist frame))
-         (cons t (ring-copy (cdr (evil-get-jumplist window))))
+     (if (null (evil-jumplist frame))
+         (cons t (ring-copy (cdr (evil-jumplist window))))
        (evil-merge-jumplists
-        (evil-get-jumplist frame) (evil-get-jumplist window))))))
+        (evil-jumplist frame) (evil-jumplist window))))))
 
 (defadvice delete-window-internal (before evil-jumps activate)
   "Merge jumplists."
@@ -882,7 +874,7 @@ Otherwise disable jumps."
 The previous jumplist copied is from the most recently selected
 window on the previous frame."
   (set-frame-parameter
-   frame 'evil-jumplist (evil-get-jumplist
+   frame 'evil-jumplist (evil-jumplist
                          (frame-selected-window (previous-frame frame)))))
 
 (add-hook 'evil-local-mode-hook #'evil-enable-jumps-in-buffer)
