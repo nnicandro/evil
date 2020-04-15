@@ -806,7 +806,7 @@ most recently set jump point set a new jump at `point'.
 
 To go the other way, press \
 \\<evil-motion-state-map>\\[evil-jump-forward]."
-  (unless (evil-forward-jumps-p (evil-get-jumplist))
+  (unless (evil-forward-jumps-p (evil-jumplist))
     (evil-set-jump)
     (let (evil-jumps-pre-jump-hook
           evil-jumps-post-jump-hook)
