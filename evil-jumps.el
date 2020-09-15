@@ -803,30 +803,34 @@ The jumps are sorted by their `evil-jump-marker-id', larger IDs
 corresponding to newer jump points. The returned jumplist
 consists of `evil-jumps-max-length' newest jumps between the
 merged jumplists."
-  (let ((jumps1 (apply #'nconc (evil-current-jumps jl1)))
-        (jumps2 (apply #'nconc (evil-current-jumps jl2)))
-        (ring (make-ring (1+ evil-jumps-max-length)))
-        (min-id most-positive-fixnum)
-        jumps)
-    (while (or jumps1 jumps2)
-      (let ((id1 (evil-jump-marker-id (car jumps1)))
-            (id2 (evil-jump-marker-id (car jumps2)))
-            id sym)
-        (cond
-         ((null id1) (setq id id2 sym 'jumps2))
-         ((null id2) (setq id id1 sym 'jumps1))
-         (t (if (>= id1 id2) (setq id id1 sym 'jumps1)
-              (setq id id2 sym 'jumps2))))
-        ;; If the id of a jump is larger or equal to the smallest id in jumps,
-        ;; then the jump is already in jumps since for each previous iteration
-        ;; the jump with the largest id was added to jumps. So only add a jump
-        ;; that has an id smaller than min-id.
-        (when (< id min-id)
-          (setq min-id id)
-          (push (car (symbol-value sym)) jumps))
-        (set sym (cdr (symbol-value sym)))))
-    (while jumps
-      (ring-insert ring (pop jumps)))
+  (let* ((jumps1 (apply #'nconc (evil-current-jumps jl1)))
+         (jumps2 (apply #'nconc (evil-current-jumps jl2)))
+         (jumps0 '())
+         (ring (make-ring (1+ evil-jumps-max-length)))
+         (min-id most-positive-fixnum))
+    (cl-macrolet ((add-jump
+                   (id jumps)
+                   `(progn
+                      ;; If the id of a jump is larger or equal to the
+                      ;; smallest id in jumps0, then the jump is
+                      ;; already in jumps0 since for each previous
+                      ;; iteration the jump with the largest id was
+                      ;; added to jumps0. So only add a jump that has
+                      ;; an id smaller than min-id.
+                      (when (< ,id min-id)
+                        (setq min-id ,id)
+                        (push (car ,jumps) jumps0))
+                      (pop ,jumps))))
+      (while (or jumps1 jumps2)
+        (let ((id1 (evil-jump-marker-id (car jumps1)))
+              (id2 (evil-jump-marker-id (car jumps2))))
+          (cond
+           ((or (null id1) (and id2 (< id1 id2)))
+            (add-jump id2 jumps2))
+           (t
+            (add-jump id1 jumps1))))))
+    (while jumps0
+      (ring-insert ring (pop jumps0)))
     ;; Insert the sentinel value
     (ring-insert-at-beginning ring 'evil)
     (cons t ring)))
