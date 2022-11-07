@@ -780,9 +780,10 @@ INDEX equal to 0."
 
 ;;; Integration
 
-(defadvice switch-to-buffer (before evil-jumps activate)
-  "Set a new jump point before switching to a new buffer."
-  (evil-set-jump))
+(defadvice set-window-buffer (before evil-jumps activate)
+  "Set a new jump point before setting a windows buffer."
+  (with-selected-window (or (ad-get-arg 0) (selected-window))
+    (evil-set-jump)))
 
 (defadvice split-window-internal (around evil-jumps activate)
   "Split the window and set the jumplist for the new window.
