@@ -9936,15 +9936,43 @@ the last."
        "z\nz\nz\nz\n[z]\nz\n"))
     (ert-info ("Jump list branches off when new jump is set")
       (evil-test-buffer
-       "[z]\nz\nz\nz\nz\nz\n"
-       ("/z" [return] "nnnn4\C-o") ;; adds a bunch of jumps after the 2nd z
-       "[z]\nz\nz\nz\nz\nz\n"
-       ("/z" [return] "nn") ;; sets a new jump, list should be reset
-       "z\nz\n[z]\nz\nz\nz\n"
-       ("\C-o")
-       "z\n[z]\nz\nz\nz\nz\n"
-       ("3\C-i") ;; even after jumping forward 3 times it can't get past the 3rd z
-       "z\nz\n[z]\nz\nz\nz\n"))))
+        "[z]\nz\nz\nz\nz\nz\nz\nz"
+        ("/z" [return] "nnnn4\C-o") ;; adds a bunch of jumps after the 2nd z
+        "z\n[z]\nz\nz\nz\nz\nz\nz"
+        ("/z" [return]) ;; sets a new jump, list should be reset
+        "z\nz\n[z]\nz\nz\nz\nz\nz"
+        ("\C-o")
+        "z\n[z]\nz\nz\nz\nz\nz\nz"
+        ("3\C-i") ;; even after jumping forward 3 times it can't get past the 3rd z
+        "z\nz\n[z]\nz\nz\nz\nz\nz"))
+    (ert-info ("Jump across files")
+      (let ((temp-file (make-temp-file "evil-test-")))
+        (unwind-protect
+          (evil-test-buffer
+            "[z] z z z z z z"
+            ("\M-x" "find-file" [return] temp-file [return] "inew buffer" [escape])
+            "new buffe[r]"
+            ("\C-o")
+            "[z] z z z z z z"
+            ("\C-i")
+            "new buffe[r]")
+          (delete-file temp-file)
+          (with-current-buffer (get-file-buffer temp-file)
+            (set-buffer-modified-p nil))
+          (kill-buffer (get-file-buffer temp-file)))))))
+
+(ert-deftest evil-test-jump-buffers ()
+  :tags '(evil jums)
+  (skip-unless nil)
+  (ert-info ("Test jumping backward and forward across buffers")
+    (evil-test-buffer
+      "[z] z z z z z z z z z"
+      (":new" [return] "inew buffer" [escape])
+      "new buffe[r]"
+      ("\C-o")
+      "[z] z z z z z z z z z"
+      ("\C-i")
+      "new buffe[r]")))
 
 (ert-deftest evil-test-abbrev-expand ()
   :tags '(evil abbrev)
