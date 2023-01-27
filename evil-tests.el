@@ -9685,15 +9685,15 @@ the last."
        "z\nz\nz\nz\n[z]\nz\n"))
     (ert-info ("Jump list branches off when new jump is set")
       (evil-test-buffer
-        "[z] z z z z z z z"
+        "[z]\nz\nz\nz\nz\nz\nz\nz"
         ("/z" [return] "nnnn4\C-o") ;; adds a bunch of jumps after the 2nd z
-        "z [z] z z z z z z"
+        "z\n[z]\nz\nz\nz\nz\nz\nz"
         ("/z" [return]) ;; sets a new jump, list should be reset
-        "z z [z] z z z z z"
+        "z\nz\n[z]\nz\nz\nz\nz\nz"
         ("\C-o")
-        "z [z] z z z z z z"
+        "z\n[z]\nz\nz\nz\nz\nz\nz"
         ("3\C-i") ;; even after jumping forward 3 times it can't get past the 3rd z
-        "z z [z] z z z z z"))
+        "z\nz\n[z]\nz\nz\nz\nz\nz"))
     (ert-info ("Jump across files")
       (let ((temp-file (make-temp-file "evil-test-")))
         (unwind-protect
