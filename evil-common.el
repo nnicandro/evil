@@ -2344,17 +2344,46 @@ The tracked insertion is set to `evil-last-insertion'."
 
 ;;; Paste
 
+(defun evil-set-register-on-yank (register text)
+  "Set REGISTER to TEXT.
+Additionally set register 0 and shift the remaining number
+registers if necessary."
+  (when register
+    (evil-set-register register text))
+  (unless (eq register ?_)
+    (evil-set-register ?\" text)
+    (unless (or register evil-is-yank-and-delete)
+      ;; "0 register contains last yanked text
+      (evil-set-register ?0 text)))
+  ;; Handle 1-9 registers when deleting
+  ;; http://vimdoc.sourceforge.net/htmldoc/change.html#registers
+  (when (and evil-is-yank-and-delete (not (eq register ?_)))
+    (let ((special-delete-motions
+           '(evil-ex-search-forward
+             evil-ex-search-backward
+             evil-ex-search-next
+             evil-ex-search-previous
+             evil-search-forward
+             evil-search-backward
+             evil-search-next
+             evil-search-previous
+             evil-jump-item
+             evil-backward-sentence-begin
+             evil-forward-sentence-begin
+             evil-goto-mark
+             evil-backward-paragraph
+             evil-forward-paragraph)))
+      (when (or (null register)
+                (memq evil-this-motion special-delete-motions))
+        (evil-set-register ?1 text))))
+  text)
+
 (defun evil-yank-characters (beg end &optional register yank-handler)
   "Save the characters defined by the region BEG and END in the kill-ring."
   (let ((text (filter-buffer-substring beg end)))
     (when yank-handler
-      (put-text-property 0 (length text) 'yank-handler (list yank-handler) text))
-    (when register
-      (evil-set-register register text))
-    (when evil-was-yanked-without-register
-      (evil-set-register ?0 text)) ; "0 register contains last yanked text
-    (unless (eq register ?_)
-      (kill-new text))))
+      (setq text (propertize text 'yank-handler (list yank-handler))))
+    (evil-set-register-on-yank register text)))
 
 (defun evil-yank-lines (beg end &optional register yank-handler)
   "Save the lines in the region BEG and END into the kill-ring."
@@ -2367,13 +2396,8 @@ The tracked insertion is set to `evil-last-insertion'."
     (when (or (zerop (length text))
               (/= (aref text (1- (length text))) ?\n))
       (setq text (concat text "\n")))
-    (put-text-property 0 (length text) 'yank-handler yank-handler text)
-    (when register
-      (evil-set-register register text))
-    (when evil-was-yanked-without-register
-      (evil-set-register ?0 text)) ; "0 register contains last yanked text
-    (unless (eq register ?_)
-      (kill-new text))))
+    (setq text (propertize text 'yank-handler yank-handler))
+    (evil-set-register-on-yank register text)))
 
 (defun evil-yank-rectangle (beg end &optional register yank-handler)
   "Save the rectangle defined by region BEG and END into the kill-ring."
@@ -2385,19 +2409,14 @@ The tracked insertion is set to `evil-last-insertion'."
     (setq lines (nreverse (cdr lines)))
     ;; `text' is used as default insert text when pasting this rectangle
     ;; in another program, e.g., using the X clipboard.
-    (let ((yank-handler (list (or yank-handler #'evil-yank-block-handler)
-                              lines
-                              t
-                              #'evil-delete-yanked-rectangle))
-          (text (mapconcat #'identity lines "\n")))
-      (put-text-property 0 (length text) 'yank-handler yank-handler text)
-      (when register
-        (evil-set-register register text))
-      (when evil-was-yanked-without-register
-        (evil-set-register ?0 text)) ; "0 register contains last yanked text
-      (unless (eq register ?_)
-        (kill-new text))
-      text)))
+    (let* ((yank-handler (list (or yank-handler
+                                   #'evil-yank-block-handler)
+                               lines
+                               t
+                               'evil-delete-yanked-rectangle))
+           (text (propertize (mapconcat #'identity lines "\n")
+                             'yank-handler yank-handler)))
+      (evil-set-register-on-yank register text))))
 
 (defun evil-remove-yank-excluded-properties (text)
   "Remove `yank-excluded-properties' from TEXT."
