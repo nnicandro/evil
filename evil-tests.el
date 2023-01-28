@@ -7630,6 +7630,34 @@ golf h[o]>tel")))
   (should (equal (evil-ex-parse "make-frame")
                  '(evil-ex-call-command nil "make-frame" nil))))
 
+(ert-deftest evil-test-ex-parse-pipe-commands ()
+  "Test parsing of commands with a :bar property"
+  :tags '(evil ex)
+  (should (equal (evil-ex-parse "s/\\(foo\\|bar\\)/\\u\\1" nil 'pipe-expression)
+                 '(evil-ex-call-command nil "s" "/\\(foo\\|bar\\)/\\u\\1")))
+  (should (equal
+           (evil-ex-parse
+            "s/foo/bar | s/\\a/\\b | s/\\c/d" nil 'pipe-expression)
+           '(evil-ex-pipe-command
+             nil "s" "/foo/bar"
+             '(evil-ex-pipe-command
+               nil "s" "/\\a/\\b"
+               '(evil-ex-call-command nil "s" "/\\c/d")))))
+  (should (equal (evil-ex-parse "1,10!ls | grep foo" nil 'pipe-expression)
+                 '(evil-ex-call-command
+                   (evil-ex-range (evil-ex-line (string-to-number "1") nil)
+                                  (evil-ex-line (string-to-number "10") nil))
+                   "!" "ls | grep foo")))
+  (should (equal (evil-ex-parse "r !ls | wc" nil 'pipe-expression)
+                 '(evil-ex-call-command nil "r" "!ls | wc"))))
+
+(ert-deftest evil-test-ex-pipe-command ()
+  :tags '(evil ex)
+  (evil-test-buffer
+    "foo\nfoo\nfoo\nBAR\nBAR\nBAR"
+    (":%g/foo/kill-whole-line | %g/BAR/downcase-word")
+    "bar\nbar\nbar"))
+
 (ert-deftest evil-text-ex-search-offset ()
   "Test for addresses like /base//pattern/"
   :tags '(evil ex)
