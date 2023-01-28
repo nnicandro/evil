@@ -2348,23 +2348,20 @@ The tracked insertion is set to `evil-last-insertion'."
 (defun evil-kill-new (text &optional register)
   "Like `kill-new', but also handle `evil' registers.
 If REGISTER is provided and it is the black hole register, ?_,
-don't do anything. When REGISTER is not the black hole register,
-store TEXT in the `kill-ring' and if the current command is not
-`evil-delete', store TEXT in the yank register, ?0.
+don't do anything. For any other register, TEXT is stored in that
+register.  TEXT is also stored in the `kill-ring' when REGISTER
+is not the black hole register.
 
-If the current command is `evil-delete', TEXT is considered
-deleted TEXT and will be stored in the first delete register, ?1,
-or the small delete register, ?-, when TEXT is within a line.
-Before TEXT is placed in register ?1, the current contents of the
-delete registers, ?1 thru ?9, will be shifted and the contents of
-oldest register, ?9, dropped if needed.
+If REGISTER is nil and `this-command' is not `evil-delete', TEXT
+is also stored in the yank register, ?0.
 
-If REGISTER is provided and is not the black hole register, do
-not store TEXT in the yank or delete registers, only store TEXT
-in REGISTER. As a special case, if the motion used to delete TEXT
-is one of `evil-special-delete-motions', store TEXT in the first
-delete register even when REGISTER is provided. And if TEXT is
-within a line, store it in small delete register as well."
+If `this-command' is `evil-delete', TEXT is considered deleted
+TEXT and will be stored in the first delete register, ?1, or the
+small delete register, ?-, when TEXT is within a line.  As a
+special, if the motion used to delete TEXT is one of
+`evil-special-delete-motions', store TEXT in the first delete
+register even when REGISTER is provided. And if TEXT is within a
+line, store it in small delete register as well."
   (prog1 text
     (unless (eq register ?_)
       (kill-new text)
