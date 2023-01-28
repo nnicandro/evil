@@ -56,6 +56,12 @@
     (pipe-expression
      (count pipe-command pipe-argument pipe pipe-expression
             #'(evil-ex-pipe-command $1 $2 $3 '$5))
+     ((\? count) pipe #'(message "%s" (save-excursion
+                                        (let ((tmp1 $1))
+                                          (when tmp1
+                                            (goto-line tmp1)))
+                                        (buffer-substring (line-beginning-position)
+                                                          (line-end-position)))))
      ((\? range) pipe-command pipe-argument pipe pipe-expression
       #'(evil-ex-pipe-command $1 $2 $3 '$5))
      (line pipe pipe-expression #'(evil-ex-pipe-sexp '(evil-goto-line $1) '$3))
