@@ -3134,7 +3134,7 @@ word3[]"))
       ("dw")
       (should (equal "xxxx" (current-kill 0 t)))
       (should (equal "xxxx" (evil-get-register ?-)))
-      (should-not (equal "xxxx" (evil-get-register ?1))))
+      (should (equal "xxxx" (evil-get-register ?1))))
     (evil-test-buffer
       "[z]zzz\n"
       ("dd")
@@ -3311,19 +3311,19 @@ sed do eiusmod tempor incididunt"))
       "a\nb\n[c]\nd\n"
       (should (string= (evil-get-register ?\") "b\n"))
       (should (string= (evil-get-register ?0) "b\n"))
-      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?1) "b\n"))
       (should (string= (evil-get-register ?2) ""))
       ("yy" [return])
       "a\nb\nc\n[d]\n"
       (should (string= (evil-get-register ?\") "c\n"))
       (should (string= (evil-get-register ?0) "c\n"))
-      (should (string= (evil-get-register ?1) ""))
-      (should (string= (evil-get-register ?2) ""))
+      (should (string= (evil-get-register ?1) "c\n"))
+      (should (string= (evil-get-register ?2) "b\n"))
       ("yy")
       (should (string= (evil-get-register ?\") "d\n"))
       (should (string= (evil-get-register ?0) "d\n"))
-      (should (string= (evil-get-register ?1) ""))
-      (should (string= (evil-get-register ?2) ""))))
+      (should (string= (evil-get-register ?1) "d\n"))
+      (should (string= (evil-get-register ?2) "c\n"))))
   (ert-info ("yanks with named register")
     (evil-set-register ?0 "")
     (evil-test-buffer
@@ -3335,9 +3335,9 @@ sed do eiusmod tempor incididunt"))
 
 (ert-deftest evil-test-number-registers-delete ()
   "Test number register behavior after `evil-delete'"
+  (dotimes (i 10)
+    (evil-set-register (+ ?0 i) ""))
   (ert-info ("deletions without named register")
-    (dotimes (i 10)
-      (evil-set-register (+ ?0 i) ""))
     (evil-test-buffer
       "[a]\nb\nc\nd\n"
       ("dd")
@@ -3355,15 +3355,13 @@ sed do eiusmod tempor incididunt"))
       (should (string= (evil-get-register ?2) "a\n"))
       (should (string= (evil-get-register ?3) ""))
       ("dd")
-      "d\n"
+      "[d]\n"
       (should (string= (evil-get-register ?\") "c\n"))
       (should (string= (evil-get-register ?0) ""))
       (should (string= (evil-get-register ?1) "c\n"))
       (should (string= (evil-get-register ?2) "b\n"))
       (should (string= (evil-get-register ?3) "a\n"))))
   (ert-info ("deletions with named register")
-    (dotimes (i 10)
-      (evil-set-register (+ ?0 i) ""))
     (evil-test-buffer
       "[a]\nb\nc\nd\n"
       ("\"add")
@@ -3371,7 +3369,7 @@ sed do eiusmod tempor incididunt"))
       (should (string= (evil-get-register ?\") "a\n"))
       (should (string= (evil-get-register ?a) "a\n"))
       (should (string= (evil-get-register ?0) ""))
-      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?1) "a\n"))
       (should (string= (evil-get-register ?2) ""))
       ("dd")
       "[c]\nd\n"
@@ -3379,7 +3377,7 @@ sed do eiusmod tempor incididunt"))
       (should (string= (evil-get-register ?a) "a\n"))
       (should (string= (evil-get-register ?0) ""))
       (should (string= (evil-get-register ?1) "b\n"))
-      (should (string= (evil-get-register ?2) "")))
+      (should (string= (evil-get-register ?2) "a\n")))
     (ert-info ("special handling of motion operators")
       (evil-test-buffer
         ;; Some operators still add the kill to the number registers in
@@ -3389,11 +3387,13 @@ sed do eiusmod tempor incididunt"))
         "[c]\nd\n"
         ("\"adn")
         "[d]\n"
-        (should (string= (evil-get-register ?\") "c\n"))
+        ("dd")
+        ""
+        (should (string= (evil-get-register ?\") "d\n"))
         (should (string= (evil-get-register ?a) "c\n"))
         (should (string= (evil-get-register ?0) ""))
-        (should (string= (evil-get-register ?1) "c\n"))
-        (should (string= (evil-get-register ?2) "b\n"))))))
+        (should (string= (evil-get-register ?1) "d\n"))
+        (should (string= (evil-get-register ?2) "c\n"))))))
 
 (ert-deftest evil-test-align ()
   "Test `evil-align-left', `evil-align-right' and `evil-align-center'."
