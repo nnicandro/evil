@@ -2086,7 +2086,11 @@ register instead of replacing its content."
    ;; don't allow modification of read-only registers
    ((member register '(?: ?. ?%))
     (user-error "Can't modify read-only register"))
-   ((eq register ?\") (kill-new text))
+   ((eq register ?\")
+    ;; As per Vim documentation, set the yank register when the
+    ;; unnamed register is specified.
+    (evil-set-register ?0 text)
+    (kill-new text))
    ((<= ?1 register ?9)
     (if (null kill-ring)
         (kill-new text)
