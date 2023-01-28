@@ -2090,6 +2090,12 @@ register instead of replacing its content."
    ((<= ?1 register ?9)
     (if (null kill-ring)
         (kill-new text)
+      ;; When the length of the `kill-ring' is less than the number of
+      ;; registers, fill it up with blanks so that `current-kill'
+      ;; rotates to the right register.
+      (when (< (length kill-ring) 9)
+        (setcdr (nthcdr (1- (length kill-ring)) kill-ring)
+                (make-list (- 9 (length kill-ring)) "")))
       (let ((kill-ring-yank-pointer kill-ring-yank-pointer)
             interprogram-paste-function
             interprogram-cut-function)
