@@ -8412,7 +8412,8 @@ the last."
 (ert-deftest evil-test-jump ()
   :tags '(evil jumps)
   (let ((evil-jumps-allowed-buffer-patterns
-         (append '("\\*test\\*") evil-jumps-allowed-buffer-patterns)))
+         (cons "\\*test\\*" evil-jumps-allowed-buffer-patterns)))
+    (evil-select-search-module 'evil-search-module 'isearch)
     (ert-info ("Test one jump point per line")
       (evil-test-buffer
        "[z] z z z z z z\na a a a a a a\n"
@@ -8471,9 +8472,9 @@ the last."
     (ert-info ("Jump list branches off when new jump is set")
       (evil-test-buffer
         "[z]\nz\nz\nz\nz\nz\nz\nz"
-        ("/z" [return] "nnnn4\C-o") ;; adds a bunch of jumps after the 2nd z
+        ("/z" [return] "nnnnn4\C-o") ;; adds a bunch of jumps after the 2nd z
         "z\n[z]\nz\nz\nz\nz\nz\nz"
-        ("/z" [return]) ;; sets a new jump, list should be reset
+        ("/z" [return] "n") ;; sets a new jump, list should be reset
         "z\nz\n[z]\nz\nz\nz\nz\nz"
         ("\C-o")
         "z\n[z]\nz\nz\nz\nz\nz\nz"
@@ -8496,17 +8497,18 @@ the last."
           (kill-buffer (get-file-buffer temp-file)))))))
 
 (ert-deftest evil-test-jump-buffers ()
-  :tags '(evil jums)
-  (skip-unless nil)
-  (ert-info ("Test jumping backward and forward across buffers")
-    (evil-test-buffer
-      "[z] z z z z z z z z z"
-      (":new" [return] "inew buffer" [escape])
-      "new buffe[r]"
-      ("\C-o")
-      "[z] z z z z z z z z z"
-      ("\C-i")
-      "new buffe[r]")))
+  :tags '(evil jumps)
+  (let ((evil-jumps-allowed-buffer-patterns
+         (cons "\\*test\\*" evil-jumps-allowed-buffer-patterns)))
+    (ert-info ("Test jumping backward and forward across buffers")
+      (evil-test-buffer
+        "[z] z z z z z z z z z"
+        (":new" [return] "inew buffer" [escape])
+        "new buffe[r]"
+        ("\C-o")
+        "[z] z z z z z z z z z"
+        ("\C-i")
+        "new buffe[r]"))))
 
 (ert-deftest evil-test-abbrev-expand ()
   :tags '(evil abbrev)
