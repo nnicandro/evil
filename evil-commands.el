@@ -3198,6 +3198,7 @@ instead of overwriting.  The current buffer's filename is not
 changed unless it has no associated file and no region is
 specified.  If the file already exists and the BANG argument is
 non-nil, it is overwritten without confirmation."
+  :bar nil
   :motion nil
   :move-point nil
   :type line
@@ -3278,6 +3279,7 @@ If no FILE is specified, reload the current buffer from disk."
 
 (evil-define-command evil-read (count file)
   "Insert the contents of FILE below the current line or line COUNT."
+  :bar nil
   :repeat nil
   :move-point nil
   (interactive "P<fsh>")
@@ -3461,6 +3463,7 @@ If BEG, END and TYPE is specified, COMMAND is executed on the region,
 which is replaced with the command's output. Otherwise, the
 output is displayed in its own buffer. If PREVIOUS is non-nil,
 the previous shell command is executed instead."
+  :bar nil
   (interactive "<R><sh><!>")
   (if (not (evil-ex-p))
       (let ((evil-ex-initial-input
@@ -3516,6 +3519,7 @@ the previous shell command is executed instead."
   "Call a build command in the current directory.
 If ARG is nil this function calls `recompile', otherwise it calls
 `compile' passing ARG as build command."
+  :bar nil
   (interactive "<sh>")
   (if (and (fboundp 'recompile)
            (not arg))
@@ -3527,6 +3531,7 @@ If ARG is nil this function calls `recompile', otherwise it calls
 (evil-define-command evil-show-registers (registers)
   "Show the contents of REGISTERS, or all registers, if none supplied."
   :repeat nil
+  :bar nil
   (interactive "<a>")
   (let* ((all-registers (evil-register-list))
          (reg-chars (string-to-list registers))
@@ -4111,6 +4116,7 @@ Use `evil-flush-lines' if INVERT is nil, or `evil-keep-lines' if not."
   (beg end pattern command &optional invert)
   "The Ex global command.
 \[BEG,END]global[!]/PATTERN/COMMAND"
+  :bar nil
   :motion mark-whole-buffer
   :move-point nil
   (interactive "<r><g/><!>")
@@ -4162,6 +4168,7 @@ Use `evil-flush-lines' if INVERT is nil, or `evil-keep-lines' if not."
   (beg end pattern command &optional invert)
   "The Ex vglobal command.
 \[BEG,END]vglobal/PATTERN/COMMAND"
+  :bar nil
   :motion mark-whole-buffer
   :move-point nil
   (interactive "<r><g/><!>")
