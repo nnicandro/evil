@@ -845,7 +845,7 @@ another window's jumplist."
   (let ((window (ad-get-arg 0)))
     (evil-merge-jumps-into-frame window (selected-frame))))
 
-(defadvice delete-other-windows (before evil-jumps activate)
+(defadvice delete-other-windows-internal (before evil-jumps activate)
   "Merge jumplists."
   (let ((this-window (selected-window)))
     (walk-windows
