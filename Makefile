@@ -10,7 +10,7 @@ LIBS = -L lib
 
 ELCFILES = $(FILES:.el=.elc)
 
-.PHONY: all compile compile-batch info pdf clean tests test emacs term terminal profiler indent elpa version
+.PHONY: all compile compile-batch docstrings doc clean tests test emacs term terminal profiler indent elpa version
 
 # Byte-compile Evil.
 all: compile
@@ -20,7 +20,7 @@ compile: $(ELCFILES)
 	@echo Compute dependencies
 	@rm -f .depend
 	@for f in $(FILES); do \
-	    sed -n "s/ *(require '\(evil-[^)]*\).*)/$${f}c: \1.elc/p" $$f >> .depend;\
+		sed -n "s/ *(require '\(evil-[^)]*\).*)/$${f}c: \1.elc/p" $$f >> .depend;\
 	done
 
 -include .depend
@@ -34,13 +34,14 @@ compile-batch: clean
 	$(EMACS) --batch -Q -L . $(LIBS) -f batch-byte-compile ${FILES}
 
 # Documentation.
-doc: info pdf
+docstrings:
+	@$(EMACS) --script scripts/evil-extract-docstrings
 
-info: clean
-	cd $(DOC) && makeinfo evil.texi
+doc: docstrings
+	@$(MAKE) -C doc texinfo
 
-pdf: clean
-	cd $(DOC) && texi2pdf evil.texi
+info: doc
+	@$(MAKE) -C doc info
 
 # Delete byte-compiled files etc.
 clean:
@@ -48,7 +49,7 @@ clean:
 	rm -f \#*\#
 	rm -f *.elc
 	rm -f .depend
-	cd $(DOC) && rm -f *.aux *.cp *.fn *.fns *.info *.ky *.log *.pg *.toc *.tp *.vr *.vrs
+	@$(MAKE) -C doc clean
 
 # Run tests.
 # The TAG variable may specify a test tag or a test name:
@@ -56,50 +57,50 @@ clean:
 # This will only run tests pertaining to the repeat system.
 test:
 	$(EMACS) -nw -Q -L . $(LIBS) -l evil-tests.el \
---eval "(evil-tests-initialize '(${TAG}) '(${PROFILER}))"
+		--eval "(evil-tests-initialize '(${TAG}) '(${PROFILER}))"
 
 # Byte-compile Evil and run all tests.
 tests: compile
 	$(EMACS) -nw -Q -L . $(LIBS) -l evil-tests.el \
---eval "(evil-tests-initialize '(${TAG}) '(${PROFILER}))"
+		--eval "(evil-tests-initialize '(${TAG}) '(${PROFILER}))"
 	rm -f *.elc .depend
 
 # Load Evil in a fresh instance of Emacs and run all tests.
 emacs:
 	$(EMACS) -Q -L . $(LIBS) -l goto-chg.el -l evil-tests.el \
---eval "(evil-mode 1)" \
---eval "(evil-tests-initialize '(${TAG}) '(${PROFILER}) t)"
+		--eval "(evil-mode 1)" \
+		--eval "(evil-tests-initialize '(${TAG}) '(${PROFILER}) t)"
 
 # Load Evil in a terminal Emacs and run all tests.
 term: terminal
 terminal:
 	$(EMACS) -nw -Q -L . $(LIBS) -l goto-chg.el -l evil-tests.el \
---eval "(evil-mode 1)" \
---eval "(evil-tests-initialize '(${TAG}) '(${PROFILER}) t)"
+		--eval "(evil-mode 1)" \
+		--eval "(evil-tests-initialize '(${TAG}) '(${PROFILER}) t)"
 
 # Run all tests with profiler.
 profiler:
 	$(EMACS) --batch -Q -L . $(LIBS) -l goto-chg.el -l evil-tests.el \
---eval "(evil-tests-initialize '(${TAG}) (or '(${PROFILER}) t))"
+		--eval "(evil-tests-initialize '(${TAG}) (or '(${PROFILER}) t))"
 
 # Re-indent all Evil code.
 # Loads Evil into memory in order to indent macros properly.
 # Also removes trailing whitespace, tabs and extraneous blank lines.
 indent: clean
 	$(EMACS) --batch --eval '(setq vc-handled-backends nil)' ${FILES} evil-tests.el -Q -L . $(LIBS) -l evil-tests.el \
---eval "(dolist (buffer (reverse (buffer-list))) \
-(when (buffer-file-name buffer) \
-(set-buffer buffer) \
-(message \"Indenting %s\" (current-buffer)) \
-(setq-default indent-tabs-mode nil) \
-(untabify (point-min) (point-max)) \
-(indent-region (point-min) (point-max)) \
-(delete-trailing-whitespace) \
-(untabify (point-min) (point-max)) \
-(goto-char (point-min)) \
-(while (re-search-forward \"\\n\\\\{3,\\\\}\" nil t) \
-(replace-match \"\\n\\n\")) \
-(when (buffer-modified-p) (save-buffer 0))))"
+		--eval "(dolist (buffer (reverse (buffer-list))) \
+		(when (buffer-file-name buffer) \
+		(set-buffer buffer) \
+		(message \"Indenting %s\" (current-buffer)) \
+		(setq-default indent-tabs-mode nil) \
+		(untabify (point-min) (point-max)) \
+		(indent-region (point-min) (point-max)) \
+		(delete-trailing-whitespace) \
+		(untabify (point-min) (point-max)) \
+		(goto-char (point-min)) \
+		(while (re-search-forward \"\\n\\\\{3,\\\\}\" nil t) \
+		(replace-match \"\\n\\n\")) \
+		(when (buffer-modified-p) (save-buffer 0))))"
 
 # Create an ELPA package.
 elpa:

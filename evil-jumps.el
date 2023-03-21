@@ -1,10 +1,10 @@
-;;; evil-jumps.el --- Jump list implementation  -*-
+;;; evil-jumps.el --- Jump list implementation -*- lexical-binding: t -*-
 
 ;; Author: Nathaniel Nicandro <nathanielnicandro at gmail.com>
 ;; Original Author: Bailey Ling <bling at live.ca>
 ;;
 
-;; Version: 1.2.14
+;; Version: 1.14.0
 
 ;;
 ;; This file is NOT part of GNU Emacs.
