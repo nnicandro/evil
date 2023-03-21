@@ -801,23 +801,32 @@ Columns are counted from zero."
   (evil-first-non-blank))
 
 (evil-define-motion evil-jump-backward (count)
-  "Go to older position in jump list.
+  "Jump backward to older positions in the jump list.
+Before jumping, if no backward jumps have been made since the
+most recently set jump point set a new jump at `point'.
+
 To go the other way, press \
 \\<evil-motion-state-map>\\[evil-jump-forward]."
-  (evil--jump-backward count))
+  (unless (evil-forward-jumps-p (evil-jumplist))
+    (evil-set-jump)
+    (let (evil-jumps-pre-jump-hook
+          evil-jumps-post-jump-hook)
+      (evil--jump 'backward 1)))
+  (evil--jump 'backward count))
 
 (evil-define-motion evil-jump-forward (count)
-  "Go to newer position in jump list.
+  "Jump forward to newer position in the jump list.
 To go the other way, press \
 \\<evil-motion-state-map>\\[evil-jump-backward]."
-  (evil--jump-forward count))
+  (evil--jump 'forward count))
 
 (evil-define-motion evil-jump-backward-swap (count)
   "Go to the previous position in jump list.
 The current position is placed in the jump list."
-  (let ((pnt (point)))
-    (evil--jump-backward 1)
-    (evil-set-jump pnt)))
+  (let ((pos (point))
+        (evil-jumps-cross-buffers nil))
+    (evil-jump-backward 1)
+    (evil-set-jump pos)))
 
 (defvar xref-prompt-for-identifier)
 (evil-define-motion evil-jump-to-tag (arg)
@@ -964,7 +973,10 @@ If the scroll count is zero the command scrolls half the screen."
       (condition-case nil
           (progn
             (scroll-down count)
-            (goto-char (posn-point (posn-at-x-y (car xy) (cdr xy)))))
+            (let ((p (posn-at-x-y (car xy) (cdr xy))))
+              (if (eq (posn-area p) 'header-line)
+                  (move-to-window-line 0)
+                (goto-char (posn-point p)))))
         (beginning-of-buffer
          (condition-case nil
              (with-no-warnings (previous-line count))
@@ -996,7 +1008,12 @@ If the scroll count is zero the command scrolls half the screen."
                      (p (posn-at-x-y (car xy) (cdr xy)))
                      (margin (max 0 (- scroll-margin
                                        (cdr (posn-col-row p))))))
-                (goto-char (posn-point p))
+                (if (eq (posn-area p) 'header-line)
+                    ;; avoid an error when the y position is 0 and there is a
+                    ;; header line. In this case, `posn-point' will return nil
+                    ;; since point cannot be within the header line.
+                    (move-to-window-line 0)
+                  (goto-char (posn-point p)))
                 ;; ensure point is not within the scroll-margin
                 (when (> margin 0)
                   (with-no-warnings (next-line margin))
@@ -1356,19 +1373,17 @@ or line COUNT to the top of the window."
   :move-point nil
   :repeat nil
   (interactive "<R><x><y>")
-  (let ((evil-was-yanked-without-register
-         (and evil-was-yanked-without-register (not register))))
-    (cond
-     ((and (fboundp 'cua--global-mark-active)
-           (fboundp 'cua-copy-region-to-global-mark)
-           (cua--global-mark-active))
-      (cua-copy-region-to-global-mark beg end))
-     ((eq type 'block)
-      (evil-yank-rectangle beg end register yank-handler))
-     ((memq type '(line screen-line))
-      (evil-yank-lines beg end register yank-handler))
-     (t
-      (evil-yank-characters beg end register yank-handler)))))
+  (cond
+   ((and (fboundp 'cua--global-mark-active)
+         (fboundp 'cua-copy-region-to-global-mark)
+         (cua--global-mark-active))
+    (cua-copy-region-to-global-mark beg end))
+   ((eq type 'block)
+    (evil-yank-rectangle beg end register yank-handler))
+   ((eq type 'line)
+    (evil-yank-lines beg end register yank-handler))
+   (t
+    (evil-yank-characters beg end register yank-handler))))
 
 (evil-define-operator evil-yank-line (beg end type register)
   "Saves whole lines into the kill-ring."
@@ -1397,7 +1412,7 @@ Save in REGISTER or in the kill-ring with YANK-HANDLER."
       (unless (string-match-p "\n" text)
         ;; set the small delete register
         (evil-set-register ?- text))))
-  (let ((evil-was-yanked-without-register nil))
+  (let ((evil-is-yank-and-delete t))
     (evil-yank beg end type register yank-handler))
   (cond
    ((eq type 'block)
@@ -2106,7 +2121,8 @@ The return value is the yanked text."
        (delete-overlay overlay))))
   (when (evil-paste-before nil register t)
     ;; go to end of pasted text
-    (unless (eobp)
+    (when (and evil-move-cursor-back
+               (not (eobp)))
       (forward-char))))
 
 (defun evil-paste-last-insertion ()

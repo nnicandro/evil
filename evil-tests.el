@@ -2737,6 +2737,101 @@ word3[]")))
     ("kdd\"0p")
     "line 1\nline 1\nline 1\n[l]ine 1\n"))
 
+(ert-deftest evil-test-number-registers-yank ()
+  "Test number register behavior after `evil-yank'"
+  (ert-info ("yanks without named register")
+    (dotimes (i 3)
+      (evil-set-register (+ ?0 i) ""))
+    (evil-test-buffer
+      "a\n[b]\nc\nd\n"
+      ("yy" [return])
+      "a\nb\n[c]\nd\n"
+      (should (string= (evil-get-register ?\") "b\n"))
+      (should (string= (evil-get-register ?0) "b\n"))
+      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?2) ""))
+      ("yy" [return])
+      "a\nb\nc\n[d]\n"
+      (should (string= (evil-get-register ?\") "c\n"))
+      (should (string= (evil-get-register ?0) "c\n"))
+      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?2) ""))
+      ("yy")
+      (should (string= (evil-get-register ?\") "d\n"))
+      (should (string= (evil-get-register ?0) "d\n"))
+      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?2) ""))))
+  (ert-info ("yanks with named register")
+    (evil-set-register ?0 "")
+    (evil-test-buffer
+      "a\n[b]\nc\nd\n"
+      ("\"ayy")
+      (should (string= (evil-get-register ?\") "b\n"))
+      (should (string= (evil-get-register ?a) "b\n"))
+      (should (string= (evil-get-register ?0) "")))))
+
+(ert-deftest evil-test-number-registers-delete ()
+  "Test number register behavior after `evil-delete'"
+  (ert-info ("deletions without named register")
+    (dotimes (i 10)
+      (evil-set-register (+ ?0 i) ""))
+    (evil-test-buffer
+      "[a]\nb\nc\nd\n"
+      ("dd")
+      "[b]\nc\nd\n"
+      (should (string= (evil-get-register ?\") "a\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) "a\n"))
+      (should (string= (evil-get-register ?2) ""))
+      (should (string= (evil-get-register ?3) ""))
+      ("dd")
+      "[c]\nd\n"
+      (should (string= (evil-get-register ?\") "b\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) "b\n"))
+      (should (string= (evil-get-register ?2) "a\n"))
+      (should (string= (evil-get-register ?3) ""))
+      ("dd")
+      "d\n"
+      (should (string= (evil-get-register ?\") "c\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) "c\n"))
+      (should (string= (evil-get-register ?2) "b\n"))
+      (should (string= (evil-get-register ?3) "a\n"))))
+  (ert-info ("deletions with named register")
+    (dotimes (i 10)
+      (evil-set-register (+ ?0 i) ""))
+    (evil-test-buffer
+      "[a]\nb\nc\nd\n"
+      ("\"add")
+      "[b]\nc\nd\n"
+      (should (string= (evil-get-register ?\") "a\n"))
+      (should (string= (evil-get-register ?a) "a\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) ""))
+      (should (string= (evil-get-register ?2) ""))
+      ("dd")
+      "[c]\nd\n"
+      (should (string= (evil-get-register ?\") "b\n"))
+      (should (string= (evil-get-register ?a) "a\n"))
+      (should (string= (evil-get-register ?0) ""))
+      (should (string= (evil-get-register ?1) "b\n"))
+      (should (string= (evil-get-register ?2) "")))
+    (ert-info ("special handling of motion operators")
+      (evil-test-buffer
+        ;; Some operators still add the kill to the number registers in
+        ;; addition to the named register
+        "[c]\nd\n"
+        ("/d" [return] "k")
+        "[c]\nd\n"
+        ("\"adn")
+        "[d]\n"
+        (should (string= (evil-get-register ?\") "c\n"))
+        (should (string= (evil-get-register ?a) "c\n"))
+        (should (string= (evil-get-register ?0) ""))
+        (should (string= (evil-get-register ?1) "c\n"))
+        (should (string= (evil-get-register ?2) "b\n"))))))
+
 (ert-deftest evil-test-align ()
   "Test `evil-align-left', `evil-align-right' and `evil-align-center'."
   :tags '(evil operator)
@@ -8250,43 +8345,162 @@ maybe we need one line more with some text\n")
       ("dao")
       "These two lines \n[!]have punctuation on them")))
 
+(defun evil-test-make-test-jumplist (forward-jumps backward-jumps)
+  "Construct a test jumplist.
+FORWARD-JUMPS and BACKWARD-JUMPS should be ordered such that
+appending them together would give an order of jumps where the
+most newly set jump point is the first element and the oldest is
+the last."
+  (let* ((ring (make-ring (+ (length forward-jumps)
+                             (length backward-jumps)
+                             1)))
+         (jumplist (cons t ring)))
+    (prog1 jumplist
+      (setq forward-jumps (reverse forward-jumps))
+      (while forward-jumps
+        (ring-insert ring (pop forward-jumps)))
+      (ring-insert ring 'evil)
+      (setq backward-jumps (reverse backward-jumps))
+      (while backward-jumps
+        (ring-insert ring (pop backward-jumps))))))
+
+(ert-deftest evil-test-loop-over-jumps ()
+  :tags '(evil jump)
+  (ert-info ("Loop order")
+    (let ((jumplist (evil-test-make-test-jumplist '(1 2) '(3 4)))
+          forward-jumps backward-jumps)
+      (evil-loop-over-jumps (jumplist jump forwardp)
+        (if forwardp
+            (push jump forward-jumps)
+          (push jump backward-jumps)))
+      (should (equal (ring-elements (cdr jumplist)) '(3 4 evil 1 2)))
+      (should (equal forward-jumps '(2 1)))
+      (should (equal backward-jumps '(4 3)))))
+  (ert-info ("Loop end condition")
+    (let ((jumplist (evil-test-make-test-jumplist '(1 2) '(3 4))))
+      (evil-loop-over-jumps (jumplist jump) t)
+      (should (equal (ring-elements (cdr jumplist)) '(3 4 evil 1 2)))
+      (evil-loop-over-jumps (jumplist jump) (>= jump 3))
+      (should (equal (ring-elements (cdr jumplist)) '(3 4 evil)))
+      (setq jumplist (evil-test-make-test-jumplist '(1 2) '(3 4)))
+      (evil-loop-over-jumps (jumplist jump) (/= jump 3))
+      (should (equal (ring-elements (cdr jumplist)) '(4 evil 1 2))))))
+
+(ert-deftest evil-test-remove-jump ()
+  :tags '(evil jump)
+  (ert-info ("Duplicated jumps")
+    (evil-test-buffer
+      "[z] z z z\nz z z z"
+      (let* ((j1 (cons 1 (set-marker (make-marker) (point))))
+             (j2 (cons 2 (set-marker (make-marker) (point))))
+             (j3 (cons 3 (set-marker (make-marker) (1+ (line-end-position)))))
+             (jumplist (evil-test-make-test-jumplist nil (list j1 j2 j3))))
+        (evil-remove-jump jumplist j1)
+        (should (equal (ring-elements (cdr jumplist)) (list j3 'evil)))))
+    (let* ((j1 (cons 1 '("foo" . 1)))
+           (j2 (cons 2 '("foo" . 1)))
+           (j3 (cons 3 '("foo" . 2)))
+           (jumplist (evil-test-make-test-jumplist nil (list j1 j2 j3))))
+      (evil-remove-jump jumplist j1)
+      (should (equal (ring-elements (cdr jumplist)) (list j3 'evil)))))
+  (ert-info ("Jumps on the same line")
+    (evil-test-buffer
+      "[z] z z z\nz z z z"
+      (let* ((j1 (cons 1 (set-marker (make-marker) (point))))
+             (j2 (cons 2 (set-marker (make-marker) (1+ (point)))))
+             (j3 (cons 3 (set-marker (make-marker) (1+ (line-end-position)))))
+             (jumplist (evil-test-make-test-jumplist nil (list j1 j2 j3))))
+        (evil-remove-jump jumplist j1)
+        (should (equal (ring-elements (cdr jumplist)) (list j3 'evil)))))))
+
+(ert-deftest evil-test-current-jumps ()
+  :tags '(evil jumps)
+  (let ((jumplist (evil-test-make-test-jumplist '(1 2) '(3 4))))
+    (cl-destructuring-bind (forward-jumps backward-jumps)
+        (evil-current-jumps jumplist)
+      (should (equal forward-jumps '(1 2)))
+      (should (equal backward-jumps '(3 4))))))
+
+(ert-deftest evil-test-merge-jumplists ()
+  :tags '(evil jumps)
+  (let ((jl1 (evil-test-make-test-jumplist
+              nil '((8) (6) (4) (3) (2) (1))))
+        (jl2 (evil-test-make-test-jumplist
+              nil '((8) (7) (5) (2) (1)))))
+    (should (equal (ring-elements (cdr (evil-merge-jumplists jl1 jl2)))
+                   '((8) (7) (6) (5) (4) (3) (2) (1) evil)))))
+
 (ert-deftest evil-test-jump ()
   :tags '(evil jumps)
-  (let ((evil--jumps-buffer-targets "\\*\\(new\\|scratch\\|test\\)\\*"))
+  (let ((evil-jumps-allowed-buffer-patterns
+         (cons "\\*test\\*" evil-jumps-allowed-buffer-patterns)))
+    (evil-select-search-module 'evil-search-module 'isearch)
+    (ert-info ("Test one jump point per line")
+      (evil-test-buffer
+       "[z] z z z z z z\na a a a a a a\n"
+       ("/z" [return] "nnnn")
+       "z z z z z [z] z\na a a a a a a\n"
+       ("/a" [return] "nnnn")
+       "z z z z z z z\na a a a [a] a a\n"
+       ("\C-o")
+       "z z z z z [z] z\na a a a a a a\n"
+       ("\C-i")
+       "z z z z z z z\na a a a [a] a a\n"))
+    (ert-info ("Test backward swap")
+      (evil-test-buffer
+       "[z]\nz\nz\nz\nz\nz\n"
+       ("/z" [return] "nnnnn")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("''")
+       "z\nz\nz\nz\n[z]\nz\n"
+       ("''")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("\C-o")
+       "z\nz\nz\nz\n[z]\nz\n"
+       ("''")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("\C-o")
+       "z\nz\nz\nz\n[z]\nz\n"))
     (ert-info ("Test jumping backward and forward in a single buffer")
       (evil-test-buffer
-        "[z] z z z z z z z z z"
-        ("/z" [return])
-        "z [z] z z z z z z z z"
-        ("nnnn")
-        "z z z z z [z] z z z z"
-        ("\C-o")
-        "z z z z [z] z z z z z"
-        ("\C-o")
-        "z z z [z] z z z z z z"
-        ("\C-i\C-i")
-        "z z z z z [z] z z z z"))
+       "[z]\nz\nz\nz\nz\nz\n"
+       ("/z" [return] "nnnnn")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("\C-o")
+       "z\nz\nz\nz\n[z]\nz\n"
+       ("\C-o")
+       "z\nz\nz\n[z]\nz\nz\n"
+       ("\C-i\C-i")
+       "z\nz\nz\nz\nz\n[z]\n"))
+    (ert-info ("Test jumping backward and forward across buffers")
+      (evil-test-buffer
+       "[z] z z z z z z z z z"
+       (":new" [return] "inew buffer" [escape])
+       "new buffe[r]"
+       ("\C-o")
+       "[z] z z z z z z z z z"
+       ("\C-i")
+       "new buffe[r]"))
     (ert-info ("Test jumping backward and forward with counts")
       (evil-test-buffer
-        "[z] z z z z z z z z z"
-        ("/z" [return] "nnnn")
-        "z z z z z [z] z z z z"
-        ("3\C-o")
-        "z z [z] z z z z z z z"
-        ("2\C-i")
-        "z z z z [z] z z z z z"
-        ))
+       "[z]\nz\nz\nz\nz\nz\n"
+       ("/z" [return] "nnnnn")
+       "z\nz\nz\nz\nz\n[z]\n"
+       ("3\C-o")
+       "z\nz\n[z]\nz\nz\nz\n"
+       ("2\C-i")
+       "z\nz\nz\nz\n[z]\nz\n"))
     (ert-info ("Jump list branches off when new jump is set")
       (evil-test-buffer
-        "[z] z z z z z z z"
-        ("/z" [return] "nnnn4\C-o") ;; adds a bunch of jumps after the 2nd z
-        "z [z] z z z z z z"
-        ("/z" [return]) ;; sets a new jump, list should be reset
-        "z z [z] z z z z z"
+        "[z]\nz\nz\nz\nz\nz\nz\nz"
+        ("/z" [return] "nnnnn4\C-o") ;; adds a bunch of jumps after the 2nd z
+        "z\n[z]\nz\nz\nz\nz\nz\nz"
+        ("/z" [return] "n") ;; sets a new jump, list should be reset
+        "z\nz\n[z]\nz\nz\nz\nz\nz"
         ("\C-o")
-        "z [z] z z z z z z"
+        "z\n[z]\nz\nz\nz\nz\nz\nz"
         ("3\C-i") ;; even after jumping forward 3 times it can't get past the 3rd z
-        "z z [z] z z z z z"))
+        "z\nz\n[z]\nz\nz\nz\nz\nz"))
     (ert-info ("Jump across files")
       (let ((temp-file (make-temp-file "evil-test-")))
         (unwind-protect
@@ -8304,17 +8518,18 @@ maybe we need one line more with some text\n")
           (kill-buffer (get-file-buffer temp-file)))))))
 
 (ert-deftest evil-test-jump-buffers ()
-  :tags '(evil jums)
-  (skip-unless nil)
-  (ert-info ("Test jumping backward and forward across buffers")
-    (evil-test-buffer
-      "[z] z z z z z z z z z"
-      (":new" [return] "inew buffer" [escape])
-      "new buffe[r]"
-      ("\C-o")
-      "[z] z z z z z z z z z"
-      ("\C-i")
-      "new buffe[r]")))
+  :tags '(evil jumps)
+  (let ((evil-jumps-allowed-buffer-patterns
+         (cons "\\*test\\*" evil-jumps-allowed-buffer-patterns)))
+    (ert-info ("Test jumping backward and forward across buffers")
+      (evil-test-buffer
+        "[z] z z z z z z z z z"
+        (":new" [return] "inew buffer" [escape])
+        "new buffe[r]"
+        ("\C-o")
+        "[z] z z z z z z z z z"
+        ("\C-i")
+        "new buffe[r]"))))
 
 (ert-deftest evil-test-abbrev-expand ()
   :tags '(evil abbrev)
@@ -8388,28 +8603,28 @@ when an error stops the execution of the macro"
   :tags '(evil undo kbd-macro)
   (ert-info ("When kbd-macro goes to the end of buffer")
     (evil-test-buffer
-      "[l]ine 1\nline 2\nline 3\nline 4"
-      (evil-set-register ?q "jdd")
-      ("jdd")
-      (should-error (execute-kbd-macro "2@q"))
-      ("uu")
-      "line 1\n[l]ine 2\nline 3\nline 4"))
+     "[l]ine 1\nline 2\nline 3\nline 4"
+     (evil-set-register ?q "jdd")
+     ("jdd")
+     (should-error (execute-kbd-macro "2@q"))
+     ("uu")
+     "line 1\n[l]ine 2\nline 3\nline 4"))
   (ert-info ("When kbd-macro goes to the end of line")
     (evil-test-buffer
-      "[f]ofof"
-      (evil-set-register ?q "lx")
-      ("lx")
-      (should-error (execute-kbd-macro "2@q"))
-      ("uu")
-      "f[o]fof"))
+     "[f]ofof"
+     (evil-set-register ?q "lx")
+     ("lx")
+     (should-error (execute-kbd-macro "2@q"))
+     ("uu")
+     "f[o]fof"))
   (ert-info ("When kbd-macro goes to the beginning of buffer")
     (evil-test-buffer
-      "line 1\nline 2\n[l]ine 3"
-      (evil-set-register ?q "kx")
-      ("kx")
-      (should-error (execute-kbd-macro "2@q"))
-      ("uu")
-      "line 1\n[l]ine 2\nline 3")))
+     "line 1\nline 2\n[l]ine 3"
+     (evil-set-register ?q "kx")
+     ("kx")
+     (should-error (execute-kbd-macro "2@q"))
+     ("uu")
+     "line 1\n[l]ine 2\nline 3")))
 
 (ert-deftest evil-test-visual-update-x-selection ()
   "Test `evil-visual-update-x-selection'."
