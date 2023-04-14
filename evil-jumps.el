@@ -264,6 +264,12 @@ skipped over and are left in the jumplist unchanged.
 
 ;;; Jump markers
 
+(defun evil-make-jumpring ()
+  "Return a ring that will hold jump markers."
+  (let ((ring (make-ring (1+ evil-jumps-max-length))))
+    (ring-insert ring 'evil)
+    ring))
+
 ;; NOTE: The optional parameter is only used when loading the jump history from
 ;; file, it shouldn't be used otherwise.
 (defun evil-jump-marker (&optional jump)
@@ -510,9 +516,7 @@ If FRAME-OR-WINDOW is nil or empty, the jumplist of the
           (set-window-parameter
            frame-or-window 'evil-jumplist
            (if jumplist (cons t jumplist)
-             (cons nil (let ((ring (make-ring (1+ evil-jumps-max-length))))
-                         (prog1 ring
-                           (ring-insert ring 'evil)))))))
+             (cons nil (evil-make-jumpring)))))
          ;; See `evil-merge-jumps-into-frame'
          ((framep frame-or-window) nil)
          (t (signal 'wrong-type-argument '(or framep windowp)))))))
@@ -568,8 +572,7 @@ remove jumps that are considered equivalent, see
 ;;; Copying the jumplist
 
 (defun evil-maybe-copy-jumplist (jumplist)
-  "Copy the ring of JUMPLIST, if necessary.
-A copy is necessary when the copy flag of JUMPLIST is t."
+  "Copy the ring of JUMPLIST, when its copy flag is non-nil."
   (when (car jumplist)
     (setcar jumplist nil)
     (setcdr jumplist (ring-copy (cdr jumplist)))))
