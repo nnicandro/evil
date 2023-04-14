@@ -874,8 +874,9 @@ Otherwise disable jumps."
 The previous jumplist copied is from the most recently selected
 window on the previous frame."
   (set-frame-parameter
-   frame 'evil-jumplist (evil-jumplist
-                         (frame-selected-window (previous-frame frame)))))
+   frame 'evil-jumplist
+   (cons t (cdr (evil-jumplist
+                 (frame-selected-window (previous-frame frame)))))))
 
 (add-hook 'evil-local-mode-hook #'evil-enable-jumps-in-buffer)
 (add-hook 'after-make-frame-functions #'evil-copy-jumps-to-frame)
