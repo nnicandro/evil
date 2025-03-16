@@ -1,8 +1,6 @@
 ;;; evil-jumps.el --- Jump list implementation -*- lexical-binding: t -*-
 
 ;; Author: Nathaniel Nicandro <nathanielnicandro at gmail.com>
-;; Original Author: Bailey Ling <bling at live.ca>
-;;
 
 ;; Version: 1.14.0
 
