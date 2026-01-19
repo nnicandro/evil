@@ -2423,7 +2423,7 @@ register even when REGISTER is provided."
               (/= (aref text (1- (length text))) ?\n))
       (setq text (concat text "\n")))
     (put-text-property 0 (length text) 'yank-handler yank-handler text)
-    (evil-kill-new register text)))
+    (evil-kill-new text register)))
 
 (defun evil-yank-rectangle (beg end &optional register yank-handler)
   "Save the rectangle defined by region BEG and END into the `kill-ring'."
@@ -2441,7 +2441,7 @@ register even when REGISTER is provided."
                               #'evil-delete-yanked-rectangle))
           (text (mapconcat #'identity lines "\n")))
       (put-text-property 0 (length text) 'yank-handler yank-handler text)
-      (evil-kill-new register text))))
+      (evil-kill-new text register))))
 
 (defun evil-remove-yank-excluded-properties (text)
   "Remove `yank-excluded-properties' from TEXT."
